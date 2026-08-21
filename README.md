@@ -55,7 +55,7 @@ sudo node server/index.js [选项]
 
   --dns-port <端口>    DNS 服务端口     默认 53
   --http-port <端口>   Web 控制台端口   默认 3000（被占用时自动 +1）
-  --upstream <IP>      上游 DNS        默认 223.5.5.5
+  --upstream <IP>      上游 DNS        默认 114.114.114.114
   --no-fallback        端口不可用时直接退出
 ```
 
@@ -139,7 +139,7 @@ sudo node server/index.js [options]
 
   --dns-port <port>   DNS service port     default 53
   --http-port <port>  Web console port     default 3000 (auto +1 if busy)
-  --upstream <IP>     Upstream DNS server  default 223.5.5.5
+  --upstream <IP>     Upstream DNS server  default 114.114.114.114
   --no-fallback       Exit instead of falling back when a port is unavailable
 ```
 

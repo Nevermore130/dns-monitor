@@ -19,7 +19,7 @@ DNS Lab — 本地 DNS 服务器与劫持/污染模拟实验台
 选项:
   --dns-port <端口>    DNS 服务端口        (默认 53，需要 sudo)
   --http-port <端口>   Web 控制台端口      (默认 3000)
-  --upstream <IP>      上游 DNS 服务器     (默认 223.5.5.5)
+  --upstream <IP>      上游 DNS 服务器     (默认 114.114.114.114)
   --no-fallback        端口不可用时直接退出，不回退
   -h, --help           显示帮助
 
@@ -30,7 +30,7 @@ DNS Lab — 本地 DNS 服务器与劫持/污染模拟实验台
 `;
 
 function parseArgs(argv) {
-  const opts = { dnsPort: 53, httpPort: 3000, upstream: '223.5.5.5', fallback: true };
+  const opts = { dnsPort: 53, httpPort: 3000, upstream: '114.114.114.114', fallback: true };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     switch (a) {

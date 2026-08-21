@@ -764,9 +764,9 @@ function initRuleForm() {
 
 /* ── 设置页 ───────────────────────────────── */
 const UPSTREAMS = [
+  { ip: '114.114.114.114', name: '114 公共 DNS' },
   { ip: '223.5.5.5', name: '阿里 AliDNS' },
   { ip: '119.29.29.29', name: '腾讯 DNSPod' },
-  { ip: '114.114.114.114', name: '114 公共 DNS' },
   { ip: '8.8.8.8', name: 'Google DNS' },
   { ip: '1.1.1.1', name: 'Cloudflare' },
 ];
