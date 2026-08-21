@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DNS Lab — 劫持与污染实验台</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="app">
+  <!-- ── 侧栏 ─────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="logo">
+      <svg class="logo-mark" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6"/>
+        <circle cx="12" cy="12" r="2.4" fill="currentColor"/>
+        <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <div class="logo-name">DNS&nbsp;LAB</div>
+        <div class="logo-sub">劫持与污染实验台</div>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav">
+      <a href="#/dashboard" data-page="dashboard">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h4l3 7 4-16 3 9h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>仪表盘</span>
+      </a>
+      <a href="#/rules" data-page="rules">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.2 7.7-8 9-4.8-1.3-8-4.5-8-9V6l8-3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>劫持规则</span>
+        <em class="nav-count" id="nav-rule-count" hidden></em>
+      </a>
+      <a href="#/guide" data-page="guide">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 16v-5M12 8h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <span>连接引导</span>
+      </a>
+      <a href="#/settings" data-page="settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.5-2-3.5-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.4 2.6a7 7 0 00-2 1.2l-2.5-1-2 3.5 2 1.5A7 7 0 005 12a7 7 0 00.1 1.2l-2 1.5 2 3.5 2.4-1a7 7 0 002 1.2L10 21h4l.4-2.6a7 7 0 002-1.2l2.5 1 2-3.5-2-1.5A7 7 0 0019 12z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        <span>设置</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="conn-pill" id="sse-pill"><i class="dot"></i><span>实时连接中</span></div>
+      <div class="version" id="foot-version">DNS Lab</div>
+    </div>
+  </aside>
+
+  <!-- ── 主区 ─────────────────────────────── -->
+  <main class="main">
+    <header class="topbar">
+      <h1 id="page-title">仪表盘</h1>
+      <div class="topbar-status" id="topbar-status"></div>
+    </header>
+
+    <div id="banner-slot"></div>
+
+    <!-- 仪表盘 -->
+    <section class="page" id="page-dashboard">
+      <div class="wire-card">
+        <div class="wire-head">
+          <span class="eyebrow">LIVE TRAFFIC · 实时包流</span>
+          <div class="wire-legend" id="wire-legend"></div>
+        </div>
+        <div class="wire-stage" id="wire-stage">
+          <div class="wire-node phone">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 18.5h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <span>手机 / 客户端</span>
+          </div>
+          <div class="wire-line" id="wire-line-1"><i class="seg"></i></div>
+          <div class="wire-node lab">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <span>DNS Lab</span>
+          </div>
+          <div class="wire-line" id="wire-line-2"><i class="seg"></i></div>
+          <div class="wire-node upstream">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+            <span>上游 DNS</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-row" id="stats-row"></div>
+
+      <div class="card onboarding" id="onboarding" hidden>
+        <div class="card-head">
+          <h2>开始使用</h2>
+          <span class="card-hint">跟着五步走，两分钟接入你的手机</span>
+          <button class="btn ghost tiny" id="onboarding-toggle" type="button">收起</button>
+        </div>
+        <ol class="steps" id="onboarding-steps"></ol>
+      </div>
+
+      <div class="card ledger">
+        <div class="card-head">
+          <h2>查询账本</h2>
+          <span class="card-hint" id="ledger-hint"></span>
+          <div class="ledger-tools">
+            <button class="chip client-chip" id="client-filter-chip" hidden type="button"></button>
+            <div class="search-box">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <input id="ledger-search" type="text" placeholder="筛选域名 / IP" autocomplete="off">
+            </div>
+            <div class="chip-group" id="ledger-filter"></div>
+            <button class="btn ghost tiny" id="ledger-pause" type="button">暂停滚动</button>
+            <button class="btn ghost tiny danger" id="ledger-clear" type="button">清空</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th class="w-time">时间</th>
+                <th class="w-client">客户端</th>
+                <th class="w-domain">域名</th>
+                <th class="w-type">类型</th>
+                <th class="w-action">判决</th>
+                <th class="w-answer">应答</th>
+                <th class="w-latency">耗时</th>
+              </tr>
+            </thead>
+            <tbody id="ledger-body"></tbody>
+          </table>
+          <div class="empty" id="ledger-empty" hidden>
+            <p>还没有任何查询。</p>
+            <p class="dim">手机连上后随便打开一个网页，或在本机执行 <code>dig @<span class="js-ip">本机IP</span> baidu.com</code></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 劫持规则 -->
+    <section class="page" id="page-rules" hidden>
+      <div class="presets-row" id="presets-row"></div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>添加规则</h2>
+          <span class="card-hint">支持精确域名与通配符（*.example.com 覆盖全部子域）</span>
+        </div>
+        <form class="rule-form" id="rule-form">
+          <div class="field" id="f-domain">
+            <label for="in-domain">域名</label>
+            <input id="in-domain" type="text" placeholder="例如 example.com 或 *.example.com" autocomplete="off" spellcheck="false">
+            <em class="field-err"></em>
+          </div>
+          <div class="field" id="f-action">
+            <label for="in-action">动作</label>
+            <select id="in-action">
+              <option value="hijack">劫持到指定 IP</option>
+              <option value="pollute">模拟污染（随机假 IP）</option>
+              <option value="nxdomain">域名不存在（NXDOMAIN）</option>
+              <option value="drop">不响应（丢弃）</option>
+              <option value="forward">正常转发（白名单）</option>
+            </select>
+            <em class="field-err"></em>
+          </div>
+          <div class="field" id="f-ip">
+            <label for="in-ip">目标 IP</label>
+            <input id="in-ip" type="text" placeholder="10.0.0.1" autocomplete="off" spellcheck="false" class="mono">
+            <em class="field-err"></em>
+          </div>
+          <div class="field">
+            <label for="in-note">备注 <s>可选</s></label>
+            <input id="in-note" type="text" placeholder="比如：钓鱼演示" autocomplete="off">
+          </div>
+          <button class="btn primary" type="submit">添加规则</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>规则列表</h2>
+          <span class="card-hint" id="rules-hint"></span>
+          <button class="btn ghost tiny danger" id="rules-clear" type="button" hidden>清空全部</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th class="w-domain">域名</th>
+                <th class="w-action">动作</th>
+                <th class="w-target">目标</th>
+                <th class="w-note">备注</th>
+                <th class="w-enabled">启用</th>
+                <th class="w-op"></th>
+              </tr>
+            </thead>
+            <tbody id="rules-body"></tbody>
+          </table>
+          <div class="empty" id="rules-empty" hidden>
+            <p>还没有规则。</p>
+            <p class="dim">应用上方任意预设快速开始，或手动添加一条。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 连接引导 -->
+    <section class="page" id="page-guide" hidden>
+      <div id="guide-root"></div>
+    </section>
+
+    <!-- 设置 -->
+    <section class="page" id="page-settings" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2>上游 DNS</h2>
+          <span class="card-hint">无规则命中的查询会转发给它；切换后解析缓存会清空</span>
+        </div>
+        <div class="upstream-grid" id="upstream-grid"></div>
+        <form class="upstream-custom" id="upstream-custom">
+          <input id="upstream-input" type="text" class="mono" placeholder="自定义 IPv4，如 192.168.1.1" autocomplete="off">
+          <button class="btn" type="submit">使用自定义</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>数据</h2>
+          <span class="card-hint">统计与日志保存在内存中，重启服务即清零</span>
+        </div>
+        <div class="danger-zone">
+          <div class="danger-item">
+            <div><b>清空查询日志与统计</b><span>不影响规则与缓存</span></div>
+            <button class="btn ghost danger" data-action="reset-stats" type="button">清空</button>
+          </div>
+          <div class="danger-item">
+            <div><b>清空解析缓存</b><span>清除后所有查询都会重新走上游</span></div>
+            <button class="btn ghost danger" data-action="clear-cache" type="button">清空</button>
+          </div>
+          <div class="danger-item">
+            <div><b>删除全部规则</b><span>data/rules.json 中的所有劫持/污染规则</span></div>
+            <button class="btn ghost danger" data-action="clear-rules" type="button">全部删除</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card about">
+        <div class="card-head"><h2>关于</h2></div>
+        <p id="about-text">DNS Lab 是一个运行在本机的 DNS 服务器与可视化实验台，用于理解 DNS 解析、劫持与污染的原理。请仅用于学习与授权测试环境。</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toasts" id="toasts"></div>
+<script src="/app.js"></script>
+<script src="/guide.js"></script>
+</body>
+</html>

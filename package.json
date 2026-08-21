@@ -1,0 +1,14 @@
+{
+  "name": "dns-monitor",
+  "version": "1.0.0",
+  "description": "DNS Lab — 本地 DNS 服务器：手机直连解析、DNS 劫持/污染模拟与可视化控制台",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
