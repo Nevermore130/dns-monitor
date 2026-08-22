@@ -25,6 +25,7 @@
 - **三个内置预设**：劫持跳转演示（example.com → 本机拦截页）、GFW 风格污染模拟、广告域名拦截
 - **多设备管理**：顶栏常驻手机连接状态（不再弹窗打扰）；设备面板支持给每台设备**起备注名**（持久化）、查看各自在线状态与统计、一键「只看此设备」筛选账本；账本客户端列可点击筛选，首查域名辅助识别陌生设备
 - **操作引导**：五步新手检查单（自动检测手机接入）、iOS / Android 图文设置步骤、CSS 手机模型、背景知识与排障手册
+- **上游劫持检测**：转发应答含保留/私有段 IP（如 Clash TUN fake-ip 的 198.18.x.x）时，控制台弹出告警并在账本逐行标记，避免手机拿到不可达地址
 
 ## 快速开始
 
@@ -109,6 +110,7 @@ A DNS server + visual console that runs on your computer. Point your phone's DNS
 - **Three built-in presets**: hijack-to-intercept-page demo (example.com → local block page), GFW-style pollution simulation, ad-domain blocking
 - **Multi-device management**: persistent phone-connection status in the top bar (no more pop-ups); a device panel for **naming each device** (persisted), viewing per-device online status and stats, and one-click "show this device only" ledger filtering; the ledger's client column is clickable to filter, and each device's first query domain helps identify strangers
 - **Onboarding guide**: a five-step checklist (auto-detects phone connection), illustrated iOS / Android setup steps, a CSS phone mockup, plus background knowledge and a troubleshooting handbook
+- **Upstream hijack detection**: when forwarded answers contain reserved/private-range IPs (e.g. 198.18.x.x from Clash TUN fake-ip), the console raises a banner and marks each affected ledger row, so you know why phones can't reach those addresses
 
 ## Quick Start
 

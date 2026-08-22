@@ -521,6 +521,9 @@ td.mono, .mono { font-family: var(--mono); font-size: 12.5px; }
 td.t-domain { color: var(--ink); font-weight: 500; }
 td.t-dim { color: var(--muted); font-size: 12px; }
 
+/* 应答列疑伪标记：上游返回保留/私有段 IP（疑似本机代理 fake-ip 劫持） */
+.sus-mark { color: var(--c-hijack); cursor: help; font-style: normal; }
+
 /* 客户端列：可点击按设备筛选 */
 .client-cell {
   background: none;

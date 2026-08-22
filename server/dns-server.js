@@ -5,6 +5,7 @@ import {
   parseQuery, parseAnswers, buildResponse,
   ipToBuffer, answerIPs, randomPollutionIP, TYPE,
 } from './dns-packet.js';
+import { findSuspicious } from './ip-sentinel.js';
 
 const HIJACK_TTL = 30; // 劫持应答 TTL，短一点方便演示中快速恢复
 const UPSTREAM_TIMEOUT = 3500;
@@ -36,6 +37,7 @@ export class DnsServer extends EventEmitter {
     return {
       total: 0, forward: 0, cache: 0, hijack: 0,
       pollute: 0, nxdomain: 0, drop: 0, error: 0,
+      suspicious: 0, // 上游应答含保留/私有地址（疑似被本机代理劫持）
     };
   }
 
@@ -54,6 +56,7 @@ export class DnsServer extends EventEmitter {
       uniqueDomains: this.domains.size,
       cacheEntries: this.cache.size,
       startedAt: this.startedAt,
+      lastSuspicious: this.lastSuspicious ?? null,
     };
   }
 
@@ -207,6 +210,7 @@ export class DnsServer extends EventEmitter {
         client, domain, type: typeLabel, action: 'cache',
         ips: hit.ips, latency: 0, firstVisit: !known,
       });
+      this.#markSuspicious(entry);
       this.stats.cache += 1; this.stats.total += 1;
       this.#broadcast(entry);
       return;
@@ -247,6 +251,7 @@ export class DnsServer extends EventEmitter {
         client, domain, type: typeLabel, action: 'forward',
         ips, latency, firstVisit: !known,
       });
+      this.#markSuspicious(entry);
       // 写入缓存（仅 RCODE=0 且含应答记录）
       if (rcode === 0 && answers && answers.length) {
         const minTtl = Math.min(...answers.map(a => a.ttl || 0), 300);
@@ -304,6 +309,15 @@ export class DnsServer extends EventEmitter {
         if (err) { clearTimeout(timer); try { sock.close(); } catch {} reject(err); }
       });
     });
+  }
+
+  /** 检测转发应答中的保留/私有 IP（疑似本机代理 fake-ip 劫持）；仅 forward/cache 路径使用 */
+  #markSuspicious(entry) {
+    const hit = findSuspicious(entry.ips);
+    if (!hit) return;
+    entry.suspicious = hit;
+    this.stats.suspicious += 1;
+    this.lastSuspicious = { ts: entry.ts, ip: hit.ip, reason: hit.reason, domain: entry.domain };
   }
 
   #log(fields) {

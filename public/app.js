@@ -336,6 +336,19 @@ function renderBanners() {
         <div>未检测到局域网 IPv4。请检查 Wi-Fi / 网线连接，否则手机无法把 DNS 指向本机。</div>
       </div>`);
   }
+  const sus = s.stats?.lastSuspicious;
+  if (sus && Date.now() - sus.ts < 120_000) {
+    banners.push(`
+      <div class="banner bad">
+        <span>⚠️</span>
+        <div>
+          <b>上游应答疑似被本机代理劫持</b>：转发 <code>${esc(sus.domain)}</code> 时收到了保留/私有段地址
+          <code>${esc(sus.ip)}</code>（${esc(sus.reason)}）。
+          通常是 Clash TUN 模式（fake-ip）或 VPN 拦截了本服务的上游查询——手机访问不了这类地址，图片和网页会加载失败。
+          <div style="margin-top:6px" class="t-dim">处理：暂时关闭本机代理 / TUN 模式后重试；新查询恢复正常后此提示会自动消失。</div>
+        </div>
+      </div>`);
+  }
   slot.innerHTML = banners.join('');
   const copyBtn = $('#banner-copy-sudo');
   if (copyBtn) copyBtn.onclick = () => copyText('sudo node server/index.js', '已复制，请在终端执行');
@@ -537,7 +550,10 @@ function queryMatches(q) {
 
 function ledgerRow(q, fresh = false) {
   const meta = ACTION_META[q.action] || ACTION_META.error;
-  const answer = q.ips.length ? q.ips.slice(0, 3).map(esc).join('<br>') : '<span class="t-dim">—</span>';
+  let answer = q.ips.length ? q.ips.slice(0, 3).map(esc).join('<br>') : '<span class="t-dim">—</span>';
+  if (q.suspicious) {
+    answer += ` <span class="sus-mark" title="上游应答 ${esc(q.suspicious.ip)}（${esc(q.suspicious.reason)}）——疑似被本机代理 fake-ip 劫持，手机无法访问">⚠</span>`;
+  }
   const clientName = displayClient(q.client);
   const clientActive = state.clientFilter === q.client;
   return `
