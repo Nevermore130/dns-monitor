@@ -43,8 +43,8 @@ export class DeviceStore extends EventEmitter {
   }
 
   /** 设置设备名（传空字符串 = 删除备注），IP 有效性校验 */
-  set(ip, name) {
-    if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(String(ip))) return { error: '非法的 IP 地址' };
+  set(ip, name, lang = 'en') {
+    if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(String(ip))) return { error: lang === 'zh' ? '非法的 IP 地址' : 'Invalid IP address' };
     const n = String(name || '').trim().slice(0, 30);
     if (!n) delete this.names[ip];
     else this.names[ip] = n;

@@ -180,6 +180,19 @@ code, .mono { font-family: var(--mono); }
 
 .topbar-status { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 
+.lang-toggle {
+  flex: none;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 4px 13px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.lang-toggle:hover { border-color: var(--brand); color: var(--ink); }
+
 .pill {
   display: inline-flex;
   align-items: center;

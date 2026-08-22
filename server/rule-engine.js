@@ -12,14 +12,54 @@ export const ACTIONS = {
   forward: { label: '正常转发(白名单)', value: 'forward' },
 };
 
+/** 校验/错误消息双语词典（默认英文） */
+const MSGS = {
+  en: {
+    emptyDomain: 'Domain is required',
+    domainTooLong: 'Domain is too long',
+    badLabel: 'Invalid domain label: "{x}"',
+    badAction: 'Unknown action type',
+    hijackNeedsIP: 'The hijack action needs a valid IPv4 address (IPv4 only for now)',
+    dupDomain: 'A rule for {x} already exists — edit or delete it first',
+    noRule: 'Rule not found',
+    badIP: 'Invalid IPv4 address',
+    noPreset: 'Preset not found',
+    noLanIP: 'No LAN IP detected on this machine — this preset cannot be applied',
+  },
+  zh: {
+    emptyDomain: '域名不能为空',
+    domainTooLong: '域名过长',
+    badLabel: '域名段格式不正确: "{x}"',
+    badAction: '无效的动作类型',
+    hijackNeedsIP: '劫持动作需要填写合法的 IPv4 地址（当前仅支持 IPv4）',
+    dupDomain: '已存在域名 {x} 的规则，请先编辑或删除',
+    noRule: '规则不存在',
+    badIP: '非法的 IPv4 地址',
+    noPreset: '预设不存在',
+    noLanIP: '未检测到本机局域网 IP，无法应用该预设',
+  },
+};
+
+export function msg(lang, key, vars) {
+  let s = (MSGS[lang] && MSGS[lang][key]) ?? MSGS.en[key] ?? key;
+  if (vars) for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v));
+  return s;
+}
+
 /** 内置预设场景（hijack-demo 的 IP 在应用时动态填充为本机局域网 IP） */
 export const PRESETS = {
   'hijack-demo': {
     key: 'hijack-demo',
     name: '劫持演示：跳到本机拦截页',
+    nameEn: 'Hijack demo: redirect to the local intercept page',
+    tag: '劫持演示',
+    tagEn: 'Hijack demo',
     description:
       '把 example.com 劫持到这台电脑。手机浏览器打开 example.com 会看到「已被劫持」演示页。' +
       '需要以 sudo 运行（占用 80 端口）。测完删除规则即可恢复。',
+    descriptionEn:
+      'Point example.com at this computer. Open example.com on the phone and you’ll see the “hijacked” demo page. ' +
+      'Requires sudo (takes port 80). Delete the rule afterwards to revert.',
     requiresLanIP: true,
     rules: [
       { domain: 'example.com', action: 'hijack', note: '劫持演示预设' },
@@ -28,9 +68,15 @@ export const PRESETS = {
   gfw: {
     key: 'gfw',
     name: '模拟 DNS 污染（GFW 风格）',
+    nameEn: 'Simulated DNS pollution (GFW-style)',
+    tag: '模拟污染',
+    tagEn: 'Pollution',
     description:
       '对一批常用境外域名返回历史经典污染 IP（假地址），模拟真实环境的 DNS 污染现象。' +
       '测试完可一键删除，或逐条禁用。',
+    descriptionEn:
+      'Return classic polluted IPs (fake addresses) for a batch of popular domains, mimicking real-world DNS pollution. ' +
+      'Remove them all with one click afterwards, or disable them one by one.',
     requiresLanIP: false,
     rules: [
       { domain: 'twitter.com', action: 'pollute', note: '污染模拟预设' },
@@ -46,8 +92,13 @@ export const PRESETS = {
   block: {
     key: 'block',
     name: '广告 / 追踪域名拦截',
+    nameEn: 'Ad / tracker domain blocking',
+    tag: '广告拦截',
+    tagEn: 'Ad blocking',
     description:
       '对常见广告与统计域名返回 NXDOMAIN（域名不存在），模拟广告拦截 DNS（如 AdGuard Home 的用法）。',
+    descriptionEn:
+      'Return NXDOMAIN (domain does not exist) for common ad and analytics domains, like an ad-blocking DNS (e.g. how AdGuard Home is used).',
     requiresLanIP: false,
     rules: [
       { domain: 'doubleclick.net', action: 'nxdomain', note: '广告拦截预设' },
@@ -60,17 +111,17 @@ export const PRESETS = {
 };
 
 /** 校验并规范化域名（支持 *.example.com 形式的后缀匹配） */
-export function normalizeDomain(input) {
+export function normalizeDomain(input, lang = 'en') {
   let d = String(input || '').trim().toLowerCase();
   if (d.endsWith('.')) d = d.slice(0, -1);
   const wildcard = d.startsWith('*.');
   const body = wildcard ? d.slice(2) : d;
-  if (!body) return { error: '域名不能为空' };
-  if (body.length > 253) return { error: '域名过长' };
+  if (!body) return { error: msg(lang, 'emptyDomain') };
+  if (body.length > 253) return { error: msg(lang, 'domainTooLong') };
   const labelRe = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
   for (const label of body.split('.')) {
     if (!label || label.length > 63 || !labelRe.test(label)) {
-      return { error: `域名段格式不正确: "${label}"` };
+      return { error: msg(lang, 'badLabel', { x: label }) };
     }
   }
   return { domain: wildcard ? `*.${body}` : body };
@@ -139,15 +190,15 @@ export class RuleEngine extends EventEmitter {
     return null;
   }
 
-  add({ domain, action, ip, note }) {
-    const norm = normalizeDomain(domain);
+  add({ domain, action, ip, note, lang = 'en' }) {
+    const norm = normalizeDomain(domain, lang);
     if (norm.error) return { error: norm.error };
-    if (!ACTIONS[action]) return { error: '无效的动作类型' };
+    if (!ACTIONS[action]) return { error: msg(lang, 'badAction') };
     if (action === 'hijack') {
-      if (!isValidIPv4(ip)) return { error: '劫持动作需要填写合法的 IPv4 地址（当前仅支持 IPv4）' };
+      if (!isValidIPv4(ip)) return { error: msg(lang, 'hijackNeedsIP') };
     }
     const dup = this.rules.find((r) => r.domain === norm.domain);
-    if (dup) return { error: `已存在域名 ${norm.domain} 的规则，请先编辑或删除` };
+    if (dup) return { error: msg(lang, 'dupDomain', { x: norm.domain }) };
     const rule = {
       id: randomUUID().slice(0, 8),
       domain: norm.domain,
@@ -162,13 +213,13 @@ export class RuleEngine extends EventEmitter {
     return { rule };
   }
 
-  update(id, patch) {
+  update(id, patch, lang = 'en') {
     const rule = this.rules.find((r) => r.id === id);
-    if (!rule) return { error: '规则不存在' };
+    if (!rule) return { error: msg(lang, 'noRule') };
     if (patch.enabled !== undefined) rule.enabled = Boolean(patch.enabled);
     if (patch.action !== undefined && ACTIONS[patch.action]) rule.action = patch.action;
     if (patch.ip !== undefined) {
-      if (rule.action === 'hijack' && !isValidIPv4(patch.ip)) return { error: '非法的 IPv4 地址' };
+      if (rule.action === 'hijack' && !isValidIPv4(patch.ip)) return { error: msg(lang, 'badIP') };
       rule.ip = patch.ip || null;
     }
     if (patch.note !== undefined) rule.note = String(patch.note).slice(0, 100);
@@ -176,10 +227,10 @@ export class RuleEngine extends EventEmitter {
     return { rule };
   }
 
-  remove(id) {
+  remove(id, lang = 'en') {
     const before = this.rules.length;
     this.rules = this.rules.filter((r) => r.id !== id);
-    if (this.rules.length === before) return { error: '规则不存在' };
+    if (this.rules.length === before) return { error: msg(lang, 'noRule') };
     this.#changed();
     return { ok: true };
   }
@@ -196,11 +247,11 @@ export class RuleEngine extends EventEmitter {
   }
 
   /** 应用预设场景。hijack-demo 需传入本机局域网 IP */
-  applyPreset(key, { lanIP } = {}) {
+  applyPreset(key, { lanIP, lang = 'en' } = {}) {
     const preset = PRESETS[key];
-    if (!preset) return { error: '预设不存在' };
+    if (!preset) return { error: msg(lang, 'noPreset') };
     if (preset.requiresLanIP && !lanIP) {
-      return { error: '未检测到本机局域网 IP，无法应用该预设' };
+      return { error: msg(lang, 'noLanIP') };
     }
     let added = 0;
     let skipped = 0;
@@ -210,6 +261,7 @@ export class RuleEngine extends EventEmitter {
       const res = this.add({
         ...spec,
         ip: spec.action === 'hijack' ? lanIP : undefined,
+        lang,
       });
       if (res.error) { skipped++; continue; }
       added++;

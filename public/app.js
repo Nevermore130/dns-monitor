@@ -1,6 +1,8 @@
 /* DNS Lab 控制台 — 状态、路由、实时事件与各页渲染 */
 'use strict';
 
+const { t, getLang, setLang } = window.I18n;
+
 /* ── 工具 ─────────────────────────────────── */
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -17,31 +19,32 @@ const fmtTime = (ts) => {
 
 const fmtRel = (ts) => {
   const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  if (s < 10) return '刚刚';
-  if (s < 60) return `${s} 秒前`;
-  if (s < 3600) return `${Math.floor(s / 60)} 分钟前`;
-  if (s < 86400) return `${Math.floor(s / 3600)} 小时前`;
-  return `${Math.floor(s / 86400)} 天前`;
+  if (s < 10) return t('time.now');
+  if (s < 60) return t('time.s', { n: s });
+  if (s < 3600) return t('time.m', { n: Math.floor(s / 60) });
+  if (s < 86400) return t('time.h', { n: Math.floor(s / 3600) });
+  return t('time.d', { n: Math.floor(s / 86400) });
 };
 
 const ACTION_META = {
-  forward:   { label: '转发',   color: 'var(--c-forward)' },
-  cache:     { label: '缓存',   color: 'var(--c-cache)' },
-  hijack:    { label: '劫持',   color: 'var(--c-hijack)' },
-  pollute:   { label: '污染',   color: 'var(--c-pollute)' },
-  nxdomain:  { label: '不存在', color: 'var(--c-nxdomain)' },
-  drop:      { label: '丢弃',   color: 'var(--c-drop)' },
-  error:     { label: '错误',   color: 'var(--c-error)' },
+  forward:   { labelKey: 'action.forward', color: 'var(--c-forward)' },
+  cache:     { labelKey: 'action.cache',   color: 'var(--c-cache)' },
+  hijack:    { labelKey: 'action.hijack',  color: 'var(--c-hijack)' },
+  pollute:   { labelKey: 'action.pollute', color: 'var(--c-pollute)' },
+  nxdomain:  { labelKey: 'action.nxdomain',color: 'var(--c-nxdomain)' },
+  drop:      { labelKey: 'action.drop',    color: 'var(--c-drop)' },
+  error:     { labelKey: 'action.error',   color: 'var(--c-error)' },
 };
+const actionLabel = (a) => t((ACTION_META[a] || ACTION_META.error).labelKey);
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Accept-Language': getLang() },
     ...opts,
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `请求失败 (${res.status})`);
+  if (!res.ok) throw new Error(data.error || t('common.reqFail', { n: res.status }));
   return data;
 }
 
@@ -54,7 +57,8 @@ function toast(msg, type = 'ok') {
   setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 300); }, 3200);
 }
 
-async function copyText(text, tip = '已复制') {
+async function copyText(text, tip) {
+  tip = tip ?? t('common.copied');
   try {
     await navigator.clipboard.writeText(text);
     toast(tip);
@@ -91,20 +95,13 @@ const isPhoneClient = (client) =>
   client && !client.startsWith('127.') && client !== '::1' && !localIPs().includes(client);
 
 /* ── 路由 ─────────────────────────────────── */
-const PAGE_TITLES = {
-  dashboard: '仪表盘',
-  rules: '劫持规则',
-  guide: '连接引导',
-  settings: '设置',
-};
-
 function handleRoute() {
   const hash = location.hash.replace('#/', '') || 'dashboard';
-  const page = PAGE_TITLES[hash] ? hash : 'dashboard';
+  const page = ['dashboard', 'rules', 'guide', 'settings'].includes(hash) ? hash : 'dashboard';
   state.page = page;
   $$('.page').forEach((el) => { el.hidden = el.id !== `page-${page}`; });
   $$('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.page === page));
-  $('#page-title').textContent = PAGE_TITLES[page];
+  $('#page-title').textContent = t(`nav.${page}`);
   if (page === 'guide' && window.Guide) window.Guide.render();
   if (page === 'settings') renderSettings();
 }
@@ -116,13 +113,13 @@ function renderTopbar() {
   const dnsOk = s.dns.running && !s.dns.privilegedWarning;
   const box = $('#topbar-status');
   box.innerHTML = `
-    <span class="pill ${dnsOk ? '' : 'bad'}"><i class="dot"></i>DNS ${esc(s.dns.port)} 端口</span>
-    <span class="pill">上游 <b>${esc(s.dns.upstream)}</b></span>
+    <span class="pill ${dnsOk ? '' : 'bad'}"><i class="dot"></i>${esc(t('topbar.dnsPort', { port: s.dns.port }))}</span>
+    <span class="pill">${esc(t('topbar.upstream'))} <b>${esc(s.dns.upstream)}</b></span>
     <span class="pill conn" id="conn-slot"></span>
-    ${s.primaryIP ? `<span class="pill click" id="pill-ip" title="点击复制">本机 <b>${esc(s.primaryIP)}</b></span>` : ''}
+    ${s.primaryIP ? `<span class="pill click" id="pill-ip" title="${esc(t('topbar.copyTitle'))}">${esc(t('topbar.local'))} <b>${esc(s.primaryIP)}</b></span>` : ''}
   `;
   const ipPill = $('#pill-ip');
-  if (ipPill) ipPill.onclick = () => copyText(s.primaryIP, `已复制 ${s.primaryIP}`);
+  if (ipPill) ipPill.onclick = () => copyText(s.primaryIP, t('topbar.copiedIp', { ip: s.primaryIP }));
   $('#foot-version').textContent = `DNS Lab v${s.version}`;
   renderConnStatus();
 }
@@ -164,15 +161,15 @@ function renderConnStatus() {
   if (online.length > 0) {
     el.className = 'pill conn ok click';
     el.title = online.map((p) =>
-      `${p.name ? `${p.name} · ` : ''}${p.ip} · ${fmtRel(p.lastSeen)}`).join('\n') + '\n点击管理设备';
-    el.innerHTML = `<i class="dot"></i>已连接 <b>${online.length}</b> 台手机`;
+      `${p.name ? `${p.name} · ` : ''}${p.ip} · ${fmtRel(p.lastSeen)}`).join('\n') + `\n${t('conn.manage')}`;
+    el.innerHTML = `<i class="dot"></i>${esc(t('conn.connectedPre'))} <b>${online.length}</b> ${esc(t('conn.connectedPost'))}`;
   } else if (phones.length > 0) {
     el.className = 'pill conn off click';
-    el.title = phones.map((p) => `${p.name ? `${p.name} · ` : ''}${p.ip}`).join(', ') + '\n点击管理设备';
-    el.innerHTML = '<i class="dot"></i>手机已离线';
+    el.title = phones.map((p) => `${p.name ? `${p.name} · ` : ''}${p.ip}`).join(', ') + `\n${t('conn.manage')}`;
+    el.innerHTML = `<i class="dot"></i>${esc(t('conn.offline'))}`;
   } else {
     el.className = 'pill conn off click';
-    el.innerHTML = '<i class="dot"></i>等待手机连接';
+    el.innerHTML = `<i class="dot"></i>${esc(t('conn.waiting'))}`;
   }
   el.onclick = toggleDevicePanel;
   if (phoneNode) phoneNode.classList.toggle('live', online.length > 0);
@@ -227,8 +224,8 @@ function renderDevicePanel() {
   const phones = phoneSnapshot();
   if (phones.length === 0) {
     popoverEl.innerHTML = `
-      <div class="dev-pop-head">已接入设备</div>
-      <div class="dev-empty">还没有设备接入。<br>按「连接引导」配置手机后会出现在这里。</div>`;
+      <div class="dev-pop-head">${esc(t('dev.title'))}</div>
+      <div class="dev-empty">${t('dev.empty')}</div>`;
     return;
   }
   const rows = phones.map((p) => {
@@ -241,26 +238,26 @@ function renderDevicePanel() {
         <div class="dev-info">
           <div class="dev-name">
             ${editing ? `
-              <input class="dev-name-input" data-dev-input="${esc(p.ip)}" value="${esc(p.name || '')}" maxlength="30" placeholder="给这台设备起个名">
+              <input class="dev-name-input" data-dev-input="${esc(p.ip)}" value="${esc(p.name || '')}" maxlength="30" placeholder="${esc(t('dev.ph'))}">
             ` : `<b data-dev-name="${esc(p.ip)}">${esc(p.name || p.ip)}</b>`}
-            <button class="icon-btn" data-rename="${esc(p.ip)}" title="${p.name ? '修改备注名' : '添加备注名'}" type="button">
+            <button class="icon-btn" data-rename="${esc(p.ip)}" title="${p.name ? esc(t('dev.rename')) : esc(t('dev.addName'))}" type="button">
               <svg width="13" height="13" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
-          <div class="dev-meta mono">${esc(p.ip)}${p.firstDomain ? ` · 首查 ${esc(p.firstDomain)}` : ''}</div>
+          <div class="dev-meta mono">${esc(p.ip)}${p.firstDomain ? ` · ${esc(t('dev.first', { d: p.firstDomain }))}` : ''}</div>
           <div class="dev-meta">
-            ${p.online ? `<span class="dev-on">在线</span> · ${fmtRel(p.lastSeen)}` : `离线 · 最后活跃 ${fmtRel(p.lastSeen)}`}
-            · 累计 ${p.queries ?? 0} 条${st.total ? ` · 近期被干预 ${st.interfered}/${st.total}` : ''}
+            ${p.online ? `<span class="dev-on">${esc(t('dev.on'))}</span> · ${fmtRel(p.lastSeen)}` : `${esc(t('dev.off'))} · ${esc(t('dev.lastSeen', { t: fmtRel(p.lastSeen) }))}`}
+            · ${esc(t('dev.total', { n: p.queries ?? 0 }))}${st.total ? ` · ${esc(t('dev.recent', { a: st.interfered, b: st.total }))}` : ''}
           </div>
         </div>
       </div>
       ${state.clientFilter === p.ip
-        ? `<button class="btn tiny" data-only="${esc(p.ip)}" type="button">取消筛选</button>`
-        : `<button class="btn tiny ghost" data-only="${esc(p.ip)}" type="button">只看此设备</button>`}
+        ? `<button class="btn tiny" data-only="${esc(p.ip)}" type="button">${esc(t('dev.unfilter'))}</button>`
+        : `<button class="btn tiny ghost" data-only="${esc(p.ip)}" type="button">${esc(t('dev.only'))}</button>`}
     </div>`;
   }).join('');
   popoverEl.innerHTML = `
-    <div class="dev-pop-head">已接入设备 · ${phones.length}<span class="dev-pop-hint">在线 ${phones.filter((p) => p.online).length}</span></div>
+    <div class="dev-pop-head">${esc(t('dev.title'))} · ${phones.length}<span class="dev-pop-hint">${esc(t('dev.onlineCount', { n: phones.filter((p) => p.online).length }))}</span></div>
     ${rows}`;
 
   // 改名：进入 / 保存 / 取消
@@ -280,7 +277,7 @@ function renderDevicePanel() {
       try {
         await api(`/api/devices/${ip}`, { method: 'PATCH', body: { name } });
         await refreshStatus();
-        toast(name ? `已命名为「${name}」` : '已清除备注名');
+        toast(name ? t('dev.named', { n: name }) : t('dev.unnamed'));
       } catch (e) { toast(e.message, 'error'); }
     };
     input.onkeydown = (e) => {
@@ -315,25 +312,24 @@ function renderBanners() {
       <div class="banner warn">
         <span>⚠️</span>
         <div>
-          DNS 端口 <code>${s.dns.wantedPort}</code> 无权限绑定，当前运行在 <code>${s.dns.port}</code>。
-          手机的「手动 DNS」只支持 53 端口——请复制以下命令重启服务：
+          ${t('banner.portWarn', { wanted: s.dns.wantedPort, port: s.dns.port })}
           <div style="margin-top:6px"><code>sudo node server/index.js</code></div>
         </div>
-        <button class="btn tiny ghost" id="banner-copy-sudo" type="button">复制命令</button>
+        <button class="btn tiny ghost" id="banner-copy-sudo" type="button">${esc(t('banner.copyCmd'))}</button>
       </div>`);
   }
   if (!s.web.demoPort && s.rulesCount !== undefined) {
     banners.push(`
       <div class="banner info">
         <span>ℹ️</span>
-        <div>80 端口未监听（需以 sudo 运行）。「劫持跳转演示」预设的手机端跳转效果不可用，其余功能不受影响。</div>
+        <div>${esc(t('banner.noDemo'))}</div>
       </div>`);
   }
   if (!s.primaryIP) {
     banners.push(`
       <div class="banner bad">
         <span>⛔</span>
-        <div>未检测到局域网 IPv4。请检查 Wi-Fi / 网线连接，否则手机无法把 DNS 指向本机。</div>
+        <div>${esc(t('banner.noLan'))}</div>
       </div>`);
   }
   const sus = s.stats?.lastSuspicious;
@@ -342,16 +338,14 @@ function renderBanners() {
       <div class="banner bad">
         <span>⚠️</span>
         <div>
-          <b>上游应答疑似被本机代理劫持</b>：转发 <code>${esc(sus.domain)}</code> 时收到了保留/私有段地址
-          <code>${esc(sus.ip)}</code>（${esc(sus.reason)}）。
-          通常是 Clash TUN 模式（fake-ip）或 VPN 拦截了本服务的上游查询——手机访问不了这类地址，图片和网页会加载失败。
-          <div style="margin-top:6px" class="t-dim">处理：暂时关闭本机代理 / TUN 模式后重试；新查询恢复正常后此提示会自动消失。</div>
+          <b>${esc(t('banner.susTitle'))}</b>：${t('banner.susBody', { domain: esc(sus.domain), ip: esc(sus.ip), reason: esc(t(`sus.reason.${sus.reason}`)) })}
+          <div style="margin-top:6px" class="t-dim">${esc(t('banner.susFix'))}</div>
         </div>
       </div>`);
   }
   slot.innerHTML = banners.join('');
   const copyBtn = $('#banner-copy-sudo');
-  if (copyBtn) copyBtn.onclick = () => copyText('sudo node server/index.js', '已复制，请在终端执行');
+  if (copyBtn) copyBtn.onclick = () => copyText('sudo node server/index.js', t('banner.copiedRun'));
 }
 
 /* ── 签名元素：包流动画 ───────────────────── */
@@ -400,12 +394,12 @@ function renderStats() {
   const st = state.stats;
   if (!st) return;
   const cards = [
-    { label: '总查询', num: st.total, color: 'var(--ink)' },
-    { label: '正常转发', num: st.forward, color: 'var(--c-forward)' },
-    { label: '缓存命中', num: st.cache, color: 'var(--c-cache)' },
-    { label: '已劫持', num: st.hijack, color: 'var(--c-hijack)' },
-    { label: '已污染', num: st.pollute, color: 'var(--c-pollute)' },
-    { label: '拦截 / 丢弃', num: st.nxdomain + st.drop, color: 'var(--c-nxdomain)' },
+    { label: t('stats.total'), num: st.total, color: 'var(--ink)' },
+    { label: t('stats.forward'), num: st.forward, color: 'var(--c-forward)' },
+    { label: t('stats.cache'), num: st.cache, color: 'var(--c-cache)' },
+    { label: t('stats.hijack'), num: st.hijack, color: 'var(--c-hijack)' },
+    { label: t('stats.pollute'), num: st.pollute, color: 'var(--c-pollute)' },
+    { label: t('stats.blocked'), num: st.nxdomain + st.drop, color: 'var(--c-nxdomain)' },
   ];
   $('#stats-row').innerHTML = cards.map((c) => `
     <div class="stat" style="--accent:${c.color}">
@@ -422,38 +416,38 @@ function obSteps() {
     ['hijack', 'pollute', 'nxdomain', 'drop'].includes(q.action));
   return [
     {
-      title: '启动 DNS 服务',
-      desc: s?.dns.running ? `DNS 已在 ${s.dns.port} 端口监听` : '等待服务启动',
+      title: t('ob.step1'),
+      desc: s?.dns.running ? t('ob.step1done', { port: s.dns.port }) : t('ob.step1wait'),
       done: Boolean(s?.dns.running && !s.dns.privilegedWarning),
       tip: s?.dns.running ? `udp://0.0.0.0:${s.dns.port}` : null,
     },
     {
-      title: '确认手机与电脑在同一 Wi-Fi',
-      desc: '查看下方本机 IP，稍后在手机上填写同一个网段的地址',
+      title: t('ob.step2'),
+      desc: t('ob.step2desc'),
       done: state.obIpSeen,
-      tip: s?.primaryIP ? `本机 IP：${s.primaryIP}` : null,
-      btn: state.obIpSeen ? null : { label: '我已确认', key: 'ip-seen' },
+      tip: s?.primaryIP ? t('ob.step2tip', { ip: s.primaryIP }) : null,
+      btn: state.obIpSeen ? null : { label: t('ob.step2btn'), key: 'ip-seen' },
     },
     {
-      title: '手机把 DNS 设为本机 IP',
+      title: t('ob.step3'),
       desc: phoneQuery
-        ? `已收到来自 ${phoneQuery.client} 的查询，连接成功`
-        : '等待来自手机的第一条查询…（设置方法见「连接引导」页）',
+        ? t('ob.step3done', { ip: phoneQuery.client })
+        : t('ob.step3wait'),
       done: Boolean(phoneQuery),
-      tip: phoneQuery ? `首条查询：${phoneQuery.domain}` : null,
-      link: phoneQuery ? null : { label: '查看图文步骤', href: '#/guide' },
+      tip: phoneQuery ? t('ob.step3tip', { d: phoneQuery.domain }) : null,
+      link: phoneQuery ? null : { label: t('ob.step3link'), href: '#/guide' },
     },
     {
-      title: '添加一条劫持规则',
-      desc: '在「劫持规则」页添加规则或应用预设',
+      title: t('ob.step4'),
+      desc: t('ob.step4desc'),
       done: state.rules.length > 0,
-      link: state.rules.length > 0 ? null : { label: '去添加规则', href: '#/rules' },
+      link: state.rules.length > 0 ? null : { label: t('ob.step4link'), href: '#/rules' },
     },
     {
-      title: '在手机上验证效果',
+      title: t('ob.step5'),
       desc: interfered
-        ? '已有被干预的查询，去账本看看判决结果吧'
-        : '对劫持/污染域名发起查询（打开网页或 dig），观察账本变化',
+        ? t('ob.step5done')
+        : t('ob.step5wait'),
       done: interfered,
     },
   ];
@@ -491,19 +485,18 @@ function renderOnboarding() {
   });
   if (allDone && !state.celebrateDone) {
     state.celebrateDone = true;
-    toast('全部步骤完成，实验环境就绪 🎉');
+    toast(t('ob.alldone'));
     renderOnboarding();
   }
 }
 
 /* ── 查询账本 ─────────────────────────────── */
 const FILTER_CHIPS = ['all', 'forward', 'hijack', 'pollute', 'nxdomain', 'drop'];
-const FILTER_LABEL = { all: '全部', forward: '转发', hijack: '劫持', pollute: '污染', nxdomain: '拦截', drop: '丢弃' };
+const filterLabel = (k) => (k === 'all' ? t('filter.all') : k === 'nxdomain' ? t('filter.nxdomain') : t(`action.${k}`));
 
-function initLedgerTools() {
-  const chips = FILTER_CHIPS.map((k) =>
-    `<button class="chip" data-filter="${k}" style="--accent:${k === 'all' ? 'var(--brand)' : ACTION_META[k]?.color}">${FILTER_LABEL[k]}</button>`).join('');
-  $('#ledger-filter').innerHTML = chips;
+function renderFilterChips() {
+  $('#ledger-filter').innerHTML = FILTER_CHIPS.map((k) =>
+    `<button class="chip ${state.ledgerFilter === k ? 'on' : ''}" data-filter="${k}" style="--accent:${k === 'all' ? 'var(--brand)' : ACTION_META[k]?.color}">${esc(filterLabel(k))}</button>`).join('');
   $$('#ledger-filter .chip').forEach((c) => {
     c.onclick = () => {
       state.ledgerFilter = c.dataset.filter;
@@ -511,7 +504,10 @@ function initLedgerTools() {
       renderLedger();
     };
   });
-  $('#ledger-filter .chip').classList.add('on');
+}
+
+function initLedgerTools() {
+  renderFilterChips();
 
   $('#ledger-search').addEventListener('input', (e) => {
     state.ledgerSearch = e.target.value.trim().toLowerCase();
@@ -530,10 +526,10 @@ function initLedgerTools() {
   });
   $('#ledger-pause').onclick = () => {
     state.ledgerPaused = !state.ledgerPaused;
-    $('#ledger-pause').textContent = state.ledgerPaused ? '恢复滚动' : '暂停滚动';
+    $('#ledger-pause').textContent = state.ledgerPaused ? t('ledger.resume') : t('ledger.pause');
   };
   $('#ledger-clear').onclick = async () => {
-    try { await api('/api/reset', { method: 'POST' }); state.queries = []; renderLedger(); renderStats(); toast('已清空日志与统计'); }
+    try { await api('/api/reset', { method: 'POST' }); state.queries = []; renderLedger(); renderStats(); toast(t('ledger.cleared')); }
     catch (e) { toast(e.message, 'error'); }
   };
 }
@@ -549,20 +545,19 @@ function queryMatches(q) {
 }
 
 function ledgerRow(q, fresh = false) {
-  const meta = ACTION_META[q.action] || ACTION_META.error;
   let answer = q.ips.length ? q.ips.slice(0, 3).map(esc).join('<br>') : '<span class="t-dim">—</span>';
   if (q.suspicious) {
-    answer += ` <span class="sus-mark" title="上游应答 ${esc(q.suspicious.ip)}（${esc(q.suspicious.reason)}）——疑似被本机代理 fake-ip 劫持，手机无法访问">⚠</span>`;
+    answer += ` <span class="sus-mark" title="${esc(t('sus.mark', { ip: q.suspicious.ip, reason: t(`sus.reason.${q.suspicious.reason}`) }))}">⚠</span>`;
   }
   const clientName = displayClient(q.client);
   const clientActive = state.clientFilter === q.client;
   return `
     <tr class="${fresh ? 'fresh' : ''}">
       <td class="t-dim mono">${fmtTime(q.ts)}</td>
-      <td><button class="client-cell mono ${clientActive ? 'on' : ''}" data-client="${esc(q.client)}" title="${clientName === q.client ? '点击只看此设备' : `${esc(q.client)} · 点击只看此设备`}" type="button">${esc(clientName)}</button></td>
+      <td><button class="client-cell mono ${clientActive ? 'on' : ''}" data-client="${esc(q.client)}" title="${clientName === q.client ? esc(t('ledger.clickOnly')) : `${esc(q.client)} · ${esc(t('ledger.clickOnly'))}`}" type="button">${esc(clientName)}</button></td>
       <td class="t-domain mono">${esc(q.domain)}</td>
       <td class="mono t-dim">${esc(q.type)}</td>
-      <td><span class="badge" data-action="${q.action}"><i></i>${meta.label}</span></td>
+      <td><span class="badge" data-action="${q.action}"><i></i>${esc(actionLabel(q.action))}</span></td>
       <td class="mono">${answer}</td>
       <td class="t-dim mono">${q.latency}ms</td>
     </tr>`;
@@ -572,7 +567,7 @@ function renderLedger() {
   const rows = state.queries.filter(queryMatches).slice(0, 150);
   $('#ledger-body').innerHTML = rows.map((q) => ledgerRow(q)).join('');
   $('#ledger-empty').hidden = rows.length > 0;
-  $$('.js-ip').forEach((el) => { el.textContent = state.status?.primaryIP || '本机IP'; });
+  $$('.js-ip').forEach((el) => { el.textContent = state.status?.primaryIP || t('ledger.thisIp'); });
   renderClientChip();
   updateLedgerHint();
 }
@@ -593,7 +588,7 @@ function renderClientChip() {
   chip.classList.add('on');
   chip.style.setProperty('--accent', 'var(--brand)');
   chip.innerHTML = `📱 ${esc(displayClient(state.clientFilter))}&nbsp;✕`;
-  chip.title = `${state.clientFilter} · 点击取消设备筛选`;
+  chip.title = t('ledger.chipTitle', { ip: state.clientFilter });
 }
 
 function updateLedgerHint() {
@@ -603,8 +598,8 @@ function updateLedgerHint() {
   const shown = state.queries.filter(queryMatches).length;
   const devPart = state.clientFilter ? `${displayClient(state.clientFilter)} · ` : '';
   $('#ledger-hint').textContent = filtered
-    ? `${devPart}显示 ${shown} / 共 ${total} 条 · 实时更新`
-    : `共 ${total} 条记录 · 实时更新`;
+    ? t('ledger.hintFiltered', { dev: devPart, shown, total })
+    : t('ledger.hintTotal', { n: total });
 }
 
 function onNewQuery(entry) {
@@ -628,23 +623,27 @@ function onNewQuery(entry) {
 /* ── 规则页 ───────────────────────────────── */
 function renderPresets() {
   const s = state.status;
+  const zh = getLang() === 'zh';
   const demoReady = Boolean(s?.web?.demoPort && s?.primaryIP);
   $('#presets-row').innerHTML = state.presets.map((p) => {
     const applied = p.rules.filter((r) => state.rules.some((x) => x.domain === r.domain)).length;
     const total = p.rules.length;
     const full = applied === total;
     const canRemove = applied > 0;
+    const name = zh ? p.name : (p.nameEn || p.name);
+    const tag = zh ? (p.tag || p.name.split('：')[0]) : (p.tagEn || p.tag || name);
+    const desc = zh ? p.description : (p.descriptionEn || p.description);
     const actionBtn = full
-      ? `<button class="btn tiny ghost danger" data-preset-remove="${p.key}" type="button">移除预设</button>`
-      : `<button class="btn tiny primary" data-preset-apply="${p.key}" type="button" ${p.key === 'hijack-demo' && !demoReady ? 'disabled title="需要 sudo 运行（80 端口）且检测到局域网 IP"' : ''}>${applied > 0 ? '补全规则' : '一键应用'}</button>`;
+      ? `<button class="btn tiny ghost danger" data-preset-remove="${p.key}" type="button">${esc(t('preset.remove'))}</button>`
+      : `<button class="btn tiny primary" data-preset-apply="${p.key}" type="button" ${p.key === 'hijack-demo' && !demoReady ? `disabled title="${esc(t('preset.needSudo'))}"` : ''}>${applied > 0 ? esc(t('preset.complete')) : esc(t('preset.apply'))}</button>`;
     return `
       <div class="preset ${p.key === 'hijack-demo' && !demoReady ? 'unavailable' : ''}">
         <h3>
-          <span class="badge" data-action="${p.key === 'hijack-demo' ? 'hijack' : p.key === 'gfw' ? 'pollute' : 'nxdomain'}"><i></i>${esc(p.name.split('：')[0])}</span>
+          <span class="badge" data-action="${p.key === 'hijack-demo' ? 'hijack' : p.key === 'gfw' ? 'pollute' : 'nxdomain'}"><i></i>${esc(tag)}</span>
         </h3>
-        <p>${esc(p.description)}</p>
+        <p>${esc(desc)}</p>
         <div class="foot">
-          <span class="count">${canRemove ? `已应用 ${applied}/${total}` : `${total} 条规则`}</span>
+          <span class="count">${canRemove ? esc(t('preset.applied', { a: applied, b: total })) : esc(t('preset.count', { n: total }))}</span>
           ${actionBtn}
         </div>
       </div>`;
@@ -655,7 +654,7 @@ function renderPresets() {
       b.disabled = true;
       try {
         const r = await api(`/api/presets/${b.dataset.presetApply}/apply`, { method: 'POST' });
-        toast(`预设已应用：新增 ${r.added} 条${r.skipped ? `，跳过 ${r.skipped} 条已存在` : ''}`);
+        toast(t('preset.appliedToast', { a: r.added, skip: r.skipped ? t('preset.skipPart', { s: r.skipped }) : '' }));
       } catch (e) { toast(e.message, 'error'); }
       await refreshRules();
     };
@@ -665,7 +664,7 @@ function renderPresets() {
       const preset = state.presets.find((p) => p.key === b.dataset.presetRemove);
       try {
         const r = await api('/api/rules/clear', { method: 'POST', body: { note: preset?.rules[0]?.note } });
-        toast(`已移除 ${r.removed} 条预设规则`);
+        toast(t('preset.removedToast', { n: r.removed }));
       } catch (e) { toast(e.message, 'error'); }
       await refreshRules();
     };
@@ -677,13 +676,13 @@ function renderRules() {
   const rules = state.rules;
   $('#rules-empty').hidden = rules.length > 0;
   $('#rules-clear').hidden = rules.length === 0;
-  $('#rules-hint').textContent = rules.length ? `${rules.length} 条规则 · 按列表顺序匹配，先命中先生效` : '';
+  $('#rules-hint').textContent = rules.length ? t('rules.hint', { n: rules.length }) : '';
   $('#nav-rule-count').hidden = rules.length === 0;
   $('#nav-rule-count').textContent = rules.length;
   tbody.innerHTML = rules.map((r) => `
     <tr>
       <td class="t-domain mono">${esc(r.domain)}</td>
-      <td><span class="badge" data-action="${r.action}"><i></i>${ACTION_META[r.action]?.label || r.action}</span></td>
+      <td><span class="badge" data-action="${r.action}"><i></i>${esc(actionLabel(r.action))}</span></td>
       <td class="mono">${r.action === 'hijack' ? esc(r.ip) : '<span class="t-dim">—</span>'}</td>
       <td class="t-dim">${r.note ? esc(r.note) : '—'}</td>
       <td>
@@ -693,7 +692,7 @@ function renderRules() {
         </label>
       </td>
       <td>
-        <button class="icon-btn" data-rule-del="${r.id}" title="删除规则" type="button">
+        <button class="icon-btn" data-rule-del="${r.id}" title="${esc(t('rules.delTitle'))}" type="button">
           <svg width="15" height="15" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         </button>
       </td>
@@ -711,7 +710,7 @@ function renderRules() {
     el.onclick = async () => {
       try {
         await api(`/api/rules/${el.dataset.ruleDel}`, { method: 'DELETE' });
-        toast('规则已删除');
+        toast(t('rules.deleted'));
         await refreshRules();
       } catch (e) { toast(e.message, 'error'); }
     };
@@ -748,7 +747,7 @@ function initRuleForm() {
           note: $('#in-note').value.trim(),
         },
       });
-      toast('规则已添加');
+      toast(t('rules.added'));
       $('#in-domain').value = '';
       $('#in-ip').value = '';
       $('#in-note').value = '';
@@ -769,10 +768,10 @@ function initRuleForm() {
   });
 
   $('#rules-clear').onclick = async () => {
-    if (!confirm('确定删除全部规则？该操作不可撤销。')) return;
+    if (!confirm(t('rules.confirmClear'))) return;
     try {
       await api('/api/rules/clear', { method: 'POST' });
-      toast('已删除全部规则');
+      toast(t('rules.cleared'));
       await refreshRules();
     } catch (e) { toast(e.message, 'error'); }
   };
@@ -780,9 +779,9 @@ function initRuleForm() {
 
 /* ── 设置页 ───────────────────────────────── */
 const UPSTREAMS = [
-  { ip: '119.29.29.29', name: '腾讯 DNSPod' },
-  { ip: '114.114.114.114', name: '114 公共 DNS' },
-  { ip: '223.5.5.5', name: '阿里 AliDNS' },
+  { ip: '119.29.29.29', nameKey: 'up.119' },
+  { ip: '114.114.114.114', nameKey: 'up.114' },
+  { ip: '223.5.5.5', nameKey: 'up.ali' },
   { ip: '8.8.8.8', name: 'Google DNS' },
   { ip: '1.1.1.1', name: 'Cloudflare' },
 ];
@@ -792,7 +791,7 @@ function renderSettings() {
   $('#upstream-grid').innerHTML = UPSTREAMS.map((u) => `
     <button class="upstream-opt ${u.ip === cur ? 'on' : ''}" data-upstream="${u.ip}" type="button">
       <span class="ip">${u.ip}</span>
-      <span class="name">${u.name}</span>
+      <span class="name">${esc(u.nameKey ? t(u.nameKey) : u.name)}</span>
     </button>`).join('');
   $$('#upstream-grid .upstream-opt').forEach((b) => {
     b.onclick = async () => {
@@ -800,7 +799,7 @@ function renderSettings() {
         const s = await api('/api/settings', { method: 'POST', body: { upstream: b.dataset.upstream } });
         state.status = s;
         renderTopbar(); renderSettings();
-        toast(`上游已切换为 ${b.dataset.upstream}`);
+        toast(t('set.switched', { ip: b.dataset.upstream }));
       } catch (e) { toast(e.message, 'error'); }
     };
   });
@@ -813,7 +812,7 @@ function initSettingsActions() {
       if (!armed) {
         armed = true;
         const origin = btn.textContent;
-        btn.textContent = '再次点击确认';
+        btn.textContent = t('set.confirm');
         setTimeout(() => { armed = false; btn.textContent = origin; }, 2600);
         return;
       }
@@ -821,17 +820,17 @@ function initSettingsActions() {
       try {
         if (btn.dataset.action === 'reset-stats') {
           await api('/api/reset', { method: 'POST' });
-          state.queries = []; renderLedger(); renderStats(); toast('已清空日志与统计');
+          state.queries = []; renderLedger(); renderStats(); toast(t('ledger.cleared'));
         } else if (btn.dataset.action === 'clear-cache') {
           await api('/api/cache/clear', { method: 'POST' });
-          toast('解析缓存已清空');
+          toast(t('set.cacheCleared'));
         } else if (btn.dataset.action === 'clear-rules') {
           await api('/api/rules/clear', { method: 'POST' });
-          toast('已删除全部规则');
+          toast(t('rules.cleared'));
           await refreshRules();
         }
       } catch (e) { toast(e.message, 'error'); }
-      btn.textContent = { 'reset-stats': '清空', 'clear-cache': '清空', 'clear-rules': '全部删除' }[btn.dataset.action];
+      btn.textContent = { 'reset-stats': t('set.clear'), 'clear-cache': t('set.clear'), 'clear-rules': t('set.delAll') }[btn.dataset.action];
     };
   });
 
@@ -844,7 +843,7 @@ function initSettingsActions() {
       state.status = s;
       renderTopbar(); renderSettings();
       $('#upstream-input').value = '';
-      toast(`上游已切换为 ${ip}`);
+      toast(t('set.switched', { ip }));
     } catch (err) { toast(err.message, 'error'); }
   });
 }
@@ -853,8 +852,8 @@ function initSettingsActions() {
 function connectSSE() {
   const es = new EventSource('/api/events');
   const pill = $('#sse-pill');
-  es.onopen = () => { pill.classList.remove('off'); pill.querySelector('span').textContent = '实时连接中'; };
-  es.onerror = () => { pill.classList.add('off'); pill.querySelector('span').textContent = '实时连接已断开，重连中…'; };
+  es.onopen = () => { pill.classList.remove('off'); pill.querySelector('span').textContent = t('side.live'); };
+  es.onerror = () => { pill.classList.add('off'); pill.querySelector('span').textContent = t('side.liveOff'); };
   es.onmessage = (ev) => {
     let msg;
     try { msg = JSON.parse(ev.data); } catch { return; }
@@ -876,7 +875,34 @@ async function refreshStatus() {
   } catch { /* 服务重启中 */ }
 }
 
-/* ── 初始化 ───────────────────────────────── */
+/* ── 语言切换与全量重渲染 ───────────────────── */
+function renderLangToggle() {
+  const btn = $('#lang-toggle');
+  if (!btn) return;
+  btn.textContent = getLang() === 'en' ? '中文' : 'EN';
+}
+
+function renderLegend() {
+  $('#wire-legend').innerHTML = ['forward', 'cache', 'hijack', 'pollute', 'nxdomain', 'drop']
+    .map((k) => `<span><i style="background:${ACTION_META[k].color}"></i>${esc(actionLabel(k))}</span>`).join('');
+}
+
+/** 切换语言后重渲染所有动态区域 */
+function rerenderAll() {
+  renderLangToggle();
+  renderLegend();
+  renderTopbar(); renderBanners(); renderStats();
+  renderFilterChips();
+  $('#ledger-pause').textContent = state.ledgerPaused ? t('ledger.resume') : t('ledger.pause');
+  renderLedger();
+  renderRules(); renderPresets(); renderOnboarding();
+  renderConnStatus();
+  const pill = $('#sse-pill');
+  if (pill) pill.querySelector('span').textContent = pill.classList.contains('off') ? t('side.liveOff') : t('side.live');
+  handleRoute();
+}
+
+/* ── 初始化 ───────────────────────────── */
 async function init() {
   $('#onboarding-toggle').onclick = () => {
     state.obDismissed = true;
@@ -888,9 +914,11 @@ async function init() {
   initRuleForm();
   initSettingsActions();
 
-  // 图例
-  $('#wire-legend').innerHTML = ['forward', 'cache', 'hijack', 'pollute', 'nxdomain', 'drop']
-    .map((k) => `<span><i style="background:${ACTION_META[k].color}"></i>${ACTION_META[k].label}</span>`).join('');
+  renderLangToggle();
+  $('#lang-toggle').onclick = () => setLang(getLang() === 'en' ? 'zh' : 'en');
+  document.addEventListener('dnslab:lang', rerenderAll);
+
+  renderLegend();
 
   const [status, queries, rules, presets] = await Promise.all([
     api('/api/status'), api('/api/queries?limit=300'), api('/api/rules'), api('/api/presets'),
@@ -914,8 +942,8 @@ async function init() {
 
 init().catch((err) => {
   document.body.insertAdjacentHTML('afterbegin',
-    `<div class="banner bad" style="margin:16px"><span>⛔</span><div>控制台初始化失败：${esc(err.message)}<br>请确认 DNS Lab 服务正在运行。</div></div>`);
+    `<div class="banner bad" style="margin:16px"><span>⛔</span><div>${t('init.fail', { msg: esc(err.message) })}</div></div>`);
 });
 
 // 暴露给 guide.js 使用
-window.App = { state, api, toast, copyText, esc, isPhoneClient, ACTION_META, renderOnboarding };
+window.App = { state, api, toast, copyText, esc, isPhoneClient, ACTION_META, actionLabel, renderOnboarding };

@@ -26,6 +26,7 @@
 - **多设备管理**：顶栏常驻手机连接状态（不再弹窗打扰）；设备面板支持给每台设备**起备注名**（持久化）、查看各自在线状态与统计、一键「只看此设备」筛选账本；账本客户端列可点击筛选，首查域名辅助识别陌生设备
 - **操作引导**：五步新手检查单（自动检测手机接入）、iOS / Android 图文设置步骤、CSS 手机模型、背景知识与排障手册
 - **上游劫持检测**：转发应答含保留/私有段 IP（如 Clash TUN fake-ip 的 198.18.x.x）时，控制台弹出告警并在账本逐行标记，避免手机拿到不可达地址
+- **中英双语**：控制台默认英文，顶栏一键切换中文（记住选择）；拦截页按浏览器语言自动适配，API 校验消息跟随 Accept-Language；CLI 支持 `--lang zh`
 
 ## 快速开始
 
@@ -58,6 +59,7 @@ sudo node server/index.js [选项]
   --http-port <端口>   Web 控制台端口   默认 3000（被占用时自动 +1）
   --upstream <IP>      上游 DNS        默认 119.29.29.29
   --no-fallback        端口不可用时直接退出
+  --lang <en|zh>       CLI / 启动横幅语言，默认 en
 ```
 
 ## 项目结构
@@ -69,6 +71,7 @@ sudo node server/index.js [选项]
 │   ├── dns-server.js    # UDP 服务：规则裁决 → 应答或上游转发（含缓存）
 │   ├── rule-engine.js   # 规则匹配（精确/通配符）、持久化、预设
 │   ├── device-store.js  # 设备备注名持久化
+│   ├── ip-sentinel.js   # 可疑应答 IP 检测（保留/私有段，上游劫持告警）
 │   ├── web-server.js    # REST API + SSE 推流 + 静态资源 + 80端口演示页
 │   └── netinfo.js       # 局域网 IP 探测
 ├── public/              # 控制台前端（原生 HTML/CSS/JS，无框架无 CDN）
@@ -111,6 +114,7 @@ A DNS server + visual console that runs on your computer. Point your phone's DNS
 - **Multi-device management**: persistent phone-connection status in the top bar (no more pop-ups); a device panel for **naming each device** (persisted), viewing per-device online status and stats, and one-click "show this device only" ledger filtering; the ledger's client column is clickable to filter, and each device's first query domain helps identify strangers
 - **Onboarding guide**: a five-step checklist (auto-detects phone connection), illustrated iOS / Android setup steps, a CSS phone mockup, plus background knowledge and a troubleshooting handbook
 - **Upstream hijack detection**: when forwarded answers contain reserved/private-range IPs (e.g. 198.18.x.x from Clash TUN fake-ip), the console raises a banner and marks each affected ledger row, so you know why phones can't reach those addresses
+- **Bilingual (EN/ZH)**: the console defaults to English with a one-click switch to Chinese in the top bar (the choice is remembered); the intercept page follows the browser language, API validation messages follow Accept-Language, and the CLI accepts `--lang zh`
 
 ## Quick Start
 
@@ -143,6 +147,7 @@ sudo node server/index.js [options]
   --http-port <port>  Web console port     default 3000 (auto +1 if busy)
   --upstream <IP>     Upstream DNS server  default 119.29.29.29
   --no-fallback       Exit instead of falling back when a port is unavailable
+  --lang <en|zh>      CLI / startup-banner language, default en
 ```
 
 ## Project structure
@@ -154,6 +159,7 @@ sudo node server/index.js [options]
 │   ├── dns-server.js    # UDP service: rule verdict → respond or forward upstream (with cache)
 │   ├── rule-engine.js   # Rule matching (exact/wildcard), persistence, presets
 │   ├── device-store.js  # Device nickname persistence
+│   ├── ip-sentinel.js   # Suspicious answer IP detection (reserved/private ranges, upstream-hijack alert)
 │   ├── web-server.js    # REST API + SSE stream + static assets + port-80 demo page
 │   └── netinfo.js       # LAN IP discovery
 ├── public/              # Console frontend (vanilla HTML/CSS/JS, no frameworks, no CDN)

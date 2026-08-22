@@ -10,7 +10,27 @@ import { DeviceStore } from './device-store.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, '../data');
 
-const HELP = `
+const HELP_EN = `
+DNS Lab — local DNS server & hijack/pollution lab
+
+Usage:
+  sudo node server/index.js [options]
+
+Options:
+  --dns-port <port>    DNS service port       (default 53, needs sudo)
+  --http-port <port>   Web console port       (default 3000)
+  --upstream <IP>      Upstream DNS server    (default 119.29.29.29)
+  --no-fallback        Exit when a port is unavailable instead of falling back
+  --lang <en|zh>       CLI / banner language  (default en)
+  -h, --help           Show this help
+
+Examples:
+  sudo node server/index.js                     # standard start (DNS:53 / console:3000)
+  node server/index.js --dns-port 5353          # no-sudo debug mode (test with dig -p 5353)
+  sudo node server/index.js --upstream 8.8.8.8  # pick an upstream
+`;
+
+const HELP_ZH = `
 DNS Lab — 本地 DNS 服务器与劫持/污染模拟实验台
 
 用法:
@@ -21,6 +41,7 @@ DNS Lab — 本地 DNS 服务器与劫持/污染模拟实验台
   --http-port <端口>   Web 控制台端口      (默认 3000)
   --upstream <IP>      上游 DNS 服务器     (默认 119.29.29.29)
   --no-fallback        端口不可用时直接退出，不回退
+  --lang <en|zh>       CLI / 启动横幅语言  (默认 en)
   -h, --help           显示帮助
 
 示例:
@@ -30,7 +51,7 @@ DNS Lab — 本地 DNS 服务器与劫持/污染模拟实验台
 `;
 
 function parseArgs(argv) {
-  const opts = { dnsPort: 53, httpPort: 3000, upstream: '119.29.29.29', fallback: true };
+  const opts = { dnsPort: 53, httpPort: 3000, upstream: '119.29.29.29', fallback: true, lang: 'en' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     switch (a) {
@@ -38,44 +59,61 @@ function parseArgs(argv) {
       case '--http-port': opts.httpPort = Number(argv[++i]); break;
       case '--upstream': opts.upstream = argv[++i]; break;
       case '--no-fallback': opts.fallback = false; break;
-      case '-h': case '--help': console.log(HELP); process.exit(0); break;
+      case '--lang': opts.lang = argv[++i] === 'zh' ? 'zh' : 'en'; break;
+      case '-h': case '--help': console.log(opts.lang === 'zh' ? HELP_ZH : HELP_EN); process.exit(0); break;
       default:
-        console.error(`未知参数: ${a}\n使用 --help 查看用法`);
+        console.error(opts.lang === 'zh'
+          ? `未知参数: ${a}\n使用 --help 查看用法`
+          : `Unknown argument: ${a}\nUse --help for usage`);
         process.exit(1);
     }
   }
   return opts;
 }
 
-function printBanner(dnsInfo, webInfo, upstream) {
+function printBanner(dnsInfo, webInfo, upstream, lang = 'en') {
+  const zh = lang === 'zh';
   const ips = getLANIPv4s();
   const line = '─'.repeat(56);
   const rows = [
-    ['控制台', `http://localhost:${webInfo.port}`],
+    [zh ? '控制台' : 'Console', `http://localhost:${webInfo.port}`],
     ...ips.slice(0, 2).map((ip) => ['', `http://${ip.address}:${webInfo.port}`]),
-    ['DNS 服务', `udp://0.0.0.0:${dnsInfo.port}${dnsInfo.privilegedWarning ? '  (已回退)' : ''}`],
-    ['上游 DNS', String(upstream)],
+    [zh ? 'DNS 服务' : 'DNS', `udp://0.0.0.0:${dnsInfo.port}${dnsInfo.privilegedWarning ? (zh ? '  (已回退)' : '  (fallback)') : ''}`],
+    [zh ? '上游 DNS' : 'Upstream', String(upstream)],
   ];
-  if (webInfo.demoPort) rows.push(['劫持演示页', `http://<本机IP>/  (80 端口拦截页)`]);
-  console.log(`\n${line}\n  DNS Lab 已启动\n${line}`);
+  if (webInfo.demoPort) rows.push([zh ? '劫持演示页' : 'Hijack demo', `http://<${zh ? '本机IP' : 'this-IP'}>/  (${zh ? '80 端口拦截页' : 'port-80 intercept page'})`]);
+  console.log(`\n${line}\n  ${zh ? 'DNS Lab 已启动' : 'DNS Lab started'}\n${line}`);
   for (const [k, v] of rows) console.log(`  ${k.padEnd(10, '\u3000')}${v}`);
-  console.log(`${line}\n  手机连接：Wi-Fi 详情 → 配置 DNS → 手动 → 填入上方局域网 IP\n`);
+  console.log(`${line}\n  ${zh
+    ? '手机连接：Wi-Fi 详情 → 配置 DNS → 手动 → 填入上方局域网 IP'
+    : 'Phone setup: Wi-Fi details → Configure DNS → Manual → enter the LAN IP above'}\n`);
 
   if (dnsInfo.privilegedWarning) {
-    console.log(`
+    console.log(zh ? `
 ⚠️  端口 ${dnsInfo.wanted} 无权限绑定，已回退到 ${dnsInfo.port}。
     手机的「手动 DNS」只支持 53 端口，请以管理员身份重新运行：
 
       sudo node server/index.js
 
     （回退端口可用于调试： dig @<本机IP> -p ${dnsInfo.port} example.com ）
+` : `
+⚠️  No permission to bind port ${dnsInfo.wanted}; fell back to ${dnsInfo.port}.
+    Phones only support port 53 for manual DNS — rerun as admin:
+
+      sudo node server/index.js
+
+    (The fallback port still works for debugging: dig @<this-IP> -p ${dnsInfo.port} example.com)
 `);
   }
   if (!webInfo.demoPort) {
-    console.log('ℹ️  80 端口未监听（无 root 权限）。劫持跳转演示页不可用，其余功能正常。');
+    console.log(zh
+      ? 'ℹ️  80 端口未监听（无 root 权限）。劫持跳转演示页不可用，其余功能正常。'
+      : 'ℹ️  Port 80 is not listening (no root). The hijack-redirect demo page is unavailable; everything else works.');
   }
   if (ips.length === 0) {
-    console.log('⚠️  未检测到局域网 IPv4 地址，请检查网络连接（手机将无法配置本机 DNS）。');
+    console.log(zh
+      ? '⚠️  未检测到局域网 IPv4 地址，请检查网络连接（手机将无法配置本机 DNS）。'
+      : '⚠️  No LAN IPv4 address detected — check the network (phones won’t be able to point their DNS here).');
   }
 }
 
@@ -99,10 +137,10 @@ async function main() {
 
   const dnsInfo = await dns.start();
   const webInfo = await web.start();
-  printBanner(dnsInfo, webInfo, opts.upstream);
+  printBanner(dnsInfo, webInfo, opts.upstream, opts.lang);
 
   const shutdown = () => {
-    console.log('\n正在停止 DNS Lab …');
+    console.log(opts.lang === 'zh' ? '\n正在停止 DNS Lab …' : '\nStopping DNS Lab …');
     dns.stop();
     web.stop();
     process.exit(0);
@@ -112,9 +150,9 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(`启动失败: ${err.message}`);
+  console.error(`Failed to start: ${err.message}`);
   if (err.code === 'EACCES') {
-    console.error('提示: 绑定 53/80 端口需要管理员权限，请使用  sudo node server/index.js');
+    console.error('Hint: binding ports 53/80 requires admin rights — use  sudo node server/index.js');
   }
   process.exit(1);
 });

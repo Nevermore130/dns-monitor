@@ -20,6 +20,14 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
 };
 
+/** 语言探测：?lang= 覆盖 > Accept-Language > 默认英文 */
+function detectLang(req, url) {
+  const q = url?.searchParams?.get('lang');
+  if (q === 'zh' || q === 'en') return q;
+  const al = String(req.headers['accept-language'] || '').toLowerCase();
+  return al.startsWith('zh') ? 'zh' : 'en';
+}
+
 export class WebServer {
   constructor({ dnsServer, rules, devices, wantedPort = 3000, wantedDemoPort = 80 }) {
     this.dns = dnsServer;
@@ -110,19 +118,19 @@ export class WebServer {
     res.end(body);
   }
 
-  async #readBody(req, limit = 64 * 1024) {
+  async #readBody(req, lang = 'en', limit = 64 * 1024) {
     return new Promise((resolve, reject) => {
       let size = 0;
       const chunks = [];
       req.on('data', (c) => {
         size += c.length;
-        if (size > limit) { reject(new Error('请求体过大')); req.destroy(); return; }
+        if (size > limit) { reject(new Error(lang === 'zh' ? '请求体过大' : 'Request body too large')); req.destroy(); return; }
         chunks.push(c);
       });
       req.on('end', () => {
         if (chunks.length === 0) return resolve({});
         try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); }
-        catch { reject(new Error('请求体不是合法 JSON')); }
+        catch { reject(new Error(lang === 'zh' ? '请求体不是合法 JSON' : 'Request body is not valid JSON')); }
       });
       req.on('error', reject);
     });
@@ -132,32 +140,33 @@ export class WebServer {
     const { method } = req;
     const path = url.pathname;
     const lanIP = getPrimaryLANIP();
+    const lang = detectLang(req, url);
 
     // 规则 CRUD
     if (path === '/api/rules' && method === 'GET') {
       return this.#json(res, 200, { rules: this.rules.list() });
     }
     if (path === '/api/rules' && method === 'POST') {
-      const body = await this.#readBody(req);
-      const result = this.rules.add(body);
+      const body = await this.#readBody(req, lang);
+      const result = this.rules.add({ ...body, lang });
       return result.error
         ? this.#json(res, 400, result)
         : this.#json(res, 200, result);
     }
     if (path === '/api/rules/clear' && method === 'POST') {
-      const body = await this.#readBody(req);
+      const body = await this.#readBody(req, lang);
       return this.#json(res, 200, this.rules.clear(body.note));
     }
     const ruleMatch = path.match(/^\/api\/rules\/([a-f0-9]+)$/);
     if (ruleMatch) {
       const id = ruleMatch[1];
       if (method === 'PATCH') {
-        const body = await this.#readBody(req);
-        const result = this.rules.update(id, body);
+        const body = await this.#readBody(req, lang);
+        const result = this.rules.update(id, body, lang);
         return result.error ? this.#json(res, 400, result) : this.#json(res, 200, result);
       }
       if (method === 'DELETE') {
-        const result = this.rules.remove(id);
+        const result = this.rules.remove(id, lang);
         return result.error ? this.#json(res, 404, result) : this.#json(res, 200, result);
       }
     }
@@ -172,15 +181,15 @@ export class WebServer {
     }
     const presetMatch = path.match(/^\/api\/presets\/([\w-]+)\/apply$/);
     if (presetMatch && method === 'POST') {
-      const result = this.rules.applyPreset(presetMatch[1], { lanIP });
+      const result = this.rules.applyPreset(presetMatch[1], { lanIP, lang });
       return result.error ? this.#json(res, 400, result) : this.#json(res, 200, result);
     }
 
     // 设备备注名（多设备区分）
     const deviceMatch = path.match(/^\/api\/devices\/((\d{1,3}\.){3}\d{1,3})$/);
     if (deviceMatch && method === 'PATCH') {
-      const body = await this.#readBody(req);
-      const result = this.devices.set(deviceMatch[1], body.name);
+      const body = await this.#readBody(req, lang);
+      const result = this.devices.set(deviceMatch[1], body.name, lang);
       if (result.error) return this.#json(res, 400, result);
       this.#broadcast({ type: 'status-changed' }); // 各标签页同步新名字
       return this.#json(res, 200, { phones: this.#status().phones });
@@ -195,10 +204,10 @@ export class WebServer {
       return this.#json(res, 200, this.#status());
     }
     if (path === '/api/settings' && method === 'POST') {
-      const body = await this.#readBody(req);
+      const body = await this.#readBody(req, lang);
       if (body.upstream) {
         if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(body.upstream)) {
-          return this.#json(res, 400, { error: '上游 DNS 需为 IPv4 地址' });
+          return this.#json(res, 400, { error: lang === 'zh' ? '上游 DNS 需为 IPv4 地址' : 'Upstream DNS must be an IPv4 address' });
         }
         this.dns.setUpstream(body.upstream);
       }
@@ -216,7 +225,7 @@ export class WebServer {
       return this.#json(res, 200, { ok: true });
     }
 
-    this.#json(res, 404, { error: '接口不存在' });
+    this.#json(res, 404, { error: lang === 'zh' ? '接口不存在' : 'Endpoint not found' });
   }
 
   #status() {
@@ -296,6 +305,9 @@ export class WebServer {
 
   // ── 80 端口劫持演示页 ───────────────────────────────
   #serveHijackPage(req, res) {
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const lang = detectLang(req, url);
+    const zh = lang === 'zh';
     const host = (req.headers.host || '').split(':')[0].toLowerCase();
     const lanIP = getPrimaryLANIP();
     const rule = host ? this.rules.match(host) : null;
@@ -306,14 +318,25 @@ export class WebServer {
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
     })[c]);
 
-    const title = hijacked ? '此域名已被 DNS 劫持' : 'DNS Lab 演示页';
+    const title = hijacked
+      ? (zh ? '此域名已被 DNS 劫持' : 'This domain has been DNS-hijacked')
+      : (zh ? 'DNS Lab 演示页' : 'DNS Lab demo page');
     const lead = hijacked
-      ? `你要访问的 <code>${escape(host)}</code> 并没有到达真实服务器。<br>DNS Lab 把它的解析结果劫持到了这台电脑（${escape(lanIP || '本机')}）。`
-      : `这是 DNS Lab 的 80 端口演示页。当你添加了「劫持」规则并把手机 DNS 指向这台电脑后，<br>被劫持域名在手机浏览器打开的就是这个页面。`;
+      ? (zh
+          ? `你要访问的 <code>${escape(host)}</code> 并没有到达真实服务器。<br>DNS Lab 把它的解析结果劫持到了这台电脑（${escape(lanIP || '本机')}）。`
+          : `Your request for <code>${escape(host)}</code> never reached the real server.<br>DNS Lab hijacked its resolution to this computer (${escape(lanIP || 'localhost')}).`)
+      : (zh
+          ? `这是 DNS Lab 的 80 端口演示页。当你添加了「劫持」规则并把手机 DNS 指向这台电脑后，<br>被劫持域名在手机浏览器打开的就是这个页面。`
+          : `This is DNS Lab’s port-80 demo page. Once you add a “hijack” rule and point your phone’s DNS at this computer,<br>opening a hijacked domain on the phone shows exactly this page.`);
+    const ruleLabel = zh ? '命中规则：' : 'Matched rule: ';
+    const cta = zh ? '打开 DNS Lab 控制台' : 'Open the DNS Lab console';
+    const foot = zh ? 'DNS Lab · 仅用于本地学习与授权测试' : 'DNS Lab · for local learning and authorised testing only';
+    const switchLang = zh ? 'en' : 'zh';
+    const switchLabel = zh ? 'English' : '中文';
 
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(`<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="${zh ? 'zh-CN' : 'en'}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -356,11 +379,11 @@ export class WebServer {
     <h1 class="${hijacked ? 'warn' : ''}">${escape(title)}</h1>
     <p>${lead}</p>
     ${rule ? `<div class="rule">
-      <span class="k">命中规则：</span><span class="v">${escape(rule.domain)}</span>
+      <span class="k">${escape(ruleLabel)}</span><span class="v">${escape(rule.domain)}</span>
       &nbsp;→&nbsp; <span class="v">${escape(rule.ip || rule.action)}</span>
     </div>` : ''}
-    <a class="cta" href="${escape(panelURL)}">打开 DNS Lab 控制台</a>
-    <p class="foot">DNS Lab · 仅用于本地学习与授权测试</p>
+    <a class="cta" href="${escape(panelURL)}">${escape(cta)}</a>
+    <p class="foot">${escape(foot)} · <a href="?lang=${switchLang}" style="color:inherit">${escape(switchLabel)}</a></p>
   </div>
 </body>
 </html>`);
