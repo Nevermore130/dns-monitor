@@ -312,6 +312,7 @@ export class WebServer {
     const lanIP = getPrimaryLANIP();
     const rule = host ? this.rules.match(host) : null;
     const hijacked = rule && rule.action === 'hijack' && rule.ip === lanIP;
+    const unfiled = rule && rule.action === 'unfiled' && rule.ip === lanIP;
     const panelURL = lanIP ? `http://${lanIP}:${this.port}/` : `http://<本机IP>:${this.port}/`;
 
     const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({
@@ -330,9 +331,15 @@ export class WebServer {
           : `This is DNS Lab’s port-80 demo page. Once you add a “hijack” rule and point your phone’s DNS at this computer,<br>opening a hijacked domain on the phone shows exactly this page.`);
     const ruleLabel = zh ? '命中规则：' : 'Matched rule: ';
     const cta = zh ? '打开 DNS Lab 控制台' : 'Open the DNS Lab console';
-    const foot = zh ? 'DNS Lab · 仅用于本地学习与授权测试' : 'DNS Lab · for local learning and authorised testing only';
+    const foot = unfiled
+      ? (zh ? 'DNS Lab 教学模拟页 · 仅用于本地学习与授权测试 · 非官方页面' : 'DNS Lab Educational Simulation · For local learning and authorised testing only · Not an official page')
+      : (zh ? 'DNS Lab · 仅用于本地学习与授权测试' : 'DNS Lab · for local learning and authorised testing only');
     const switchLang = zh ? 'en' : 'zh';
     const switchLabel = zh ? 'English' : '中文';
+
+    const borderColor = unfiled ? '#FB923C' : '#FB5C7D';
+    const glyphIcon = unfiled ? '⚠️' : (hijacked ? '🚨' : '🧪');
+    const headClass = unfiled || hijacked ? 'warn' : '';
 
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(`<!DOCTYPE html>
@@ -345,38 +352,39 @@ export class WebServer {
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    background: #0D0F11; color: #E7EBE2;
+    background: ${unfiled ? '#F5F5F5' : '#0D0F11'}; color: ${unfiled ? '#1F2937' : '#E7EBE2'};
     font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
     padding: 24px;
   }
   .card {
     max-width: 560px; width: 100%; text-align: center;
-    background: #14171A; border: 1px solid #2A1E1E; border-top: 3px solid #FB5C7D;
-    border-radius: 16px; padding: 48px 32px;
+    background: ${unfiled ? '#FFFFFF' : '#14171A'}; border: 1px solid ${unfiled ? '#E5E7EB' : '#2A1E1E'}; border-top: 3px solid ${borderColor};
+    border-radius: 16px; padding: 48px 32px; ${unfiled ? 'box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);' : ''}
   }
   .glyph { font-size: 44px; margin-bottom: 16px; }
-  h1 { font-size: 24px; letter-spacing: 1px; margin-bottom: 20px; }
-  h1.warn { color: #FB5C7D; }
-  p { line-height: 1.9; color: #9AA6A0; font-size: 15px; }
+  h1 { font-size: 24px; letter-spacing: 1px; margin-bottom: 20px; ${unfiled ? 'color: #1F2937;' : ''} }
+  h1.warn { color: ${unfiled ? '#FB923C' : '#FB5C7D'}; }
+  p { line-height: 1.9; color: ${unfiled ? '#4B5563' : '#9AA6A0'}; font-size: 15px; }
+  strong { color: ${unfiled ? '#FB923C' : '#34D399'}; }
   code {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
-    background: #1D2226; padding: 2px 8px; border-radius: 6px; color: #4ADE80; font-size: 14px;
+    background: ${unfiled ? '#F3F4F6' : '#1D2226'}; padding: 2px 8px; border-radius: 6px; color: ${unfiled ? '#1F2937' : '#4ADE80'}; font-size: 14px;
   }
-  .rule { margin: 20px 0; padding: 14px; background: #1D2226; border-radius: 10px; font-size: 14px; }
-  .rule .k { color: #8A938E; }
-  .rule .v { color: #FBBF24; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .rule { margin: 20px 0; padding: 14px; background: ${unfiled ? '#F9FAFB' : '#1D2226'}; border-radius: 10px; font-size: 14px; }
+  .rule .k { color: ${unfiled ? '#6B7280' : '#8A938E'}; }
+  .rule .v { color: ${unfiled ? '#F59E0B' : '#FBBF24'}; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
   .cta {
     display: inline-block; margin-top: 24px; text-decoration: none;
-    background: #34D399; color: #0D0F11; font-weight: 600;
+    background: ${unfiled ? '#FB923C' : '#34D399'}; color: ${unfiled ? '#FFFFFF' : '#0D0F11'}; font-weight: 600;
     padding: 12px 28px; border-radius: 10px; font-size: 15px;
   }
-  .foot { margin-top: 28px; font-size: 12px; color: #5C6660; }
+  .foot { margin-top: 28px; font-size: 12px; color: ${unfiled ? '#9CA3AF' : '#5C6660'}; }
 </style>
 </head>
 <body>
   <div class="card">
-    <div class="glyph">${hijacked ? '🚨' : '🧪'}</div>
-    <h1 class="${hijacked ? 'warn' : ''}">${escape(title)}</h1>
+    <div class="glyph">${glyphIcon}</div>
+    <h1 class="${headClass}">${escape(title)}</h1>
     <p>${lead}</p>
     ${rule ? `<div class="rule">
       <span class="k">${escape(ruleLabel)}</span><span class="v">${escape(rule.domain)}</span>

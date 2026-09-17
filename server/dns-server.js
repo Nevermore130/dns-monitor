@@ -36,7 +36,7 @@ export class DnsServer extends EventEmitter {
   #freshStats() {
     return {
       total: 0, forward: 0, cache: 0, hijack: 0,
-      pollute: 0, nxdomain: 0, drop: 0, error: 0,
+      pollute: 0, unfiled: 0, nxdomain: 0, drop: 0, error: 0,
       suspicious: 0, // 上游应答含保留/私有地址（疑似被本机代理劫持）
     };
   }
@@ -180,8 +180,8 @@ export class DnsServer extends EventEmitter {
       try {
         if (rule.action === 'nxdomain') {
           response = buildResponse(msg, q, { rcode: 3, answers: [] });
-        } else if (rule.action === 'hijack' || rule.action === 'pollute') {
-          const ip = rule.action === 'hijack' ? rule.ip : randomPollutionIP();
+        } else if (rule.action === 'hijack' || rule.action === 'pollute' || rule.action === 'unfiled') {
+          const ip = rule.action === 'pollute' ? randomPollutionIP() : rule.ip;
           // 仅 A 查询返回地址记录；AAAA/其他类型返回空 NOERROR，引导客户端回落到 A 查询
           const answers = q.type === TYPE.A
             ? [{ name: domain, type: TYPE.A, ttl: HIJACK_TTL, data: ipToBuffer(ip) }]

@@ -11,18 +11,19 @@ A DNS server + visual console that runs on your computer. Point your phone's DNS
 ## Features
 
 - **Real DNS service**: listens on UDP port 53 so phones can connect directly via "manual DNS"; unmatched queries are faithfully forwarded upstream (Alibaba / Tencent / 114 / Google / Cloudflare or custom), with TTL caching
-- **Five intervention actions**
+- **Six intervention actions**
 
   | Action | Effect | Typical use |
   |---|---|---|
   | Hijack | Returns a chosen IP | Phishing / redirect demo |
   | Pollute | Returns fake IPs from the classic pollution pool | GFW-style DNS poisoning demo |
+  | Unfiled ICP | Returns local IP, shows unfiled ICP intercept page | Mainland China unfiled ICP simulation |
   | NXDOMAIN | Returns "domain does not exist" | Ad / tracker blocking |
   | Drop | No response at all | Simulating resolution timeout |
   | Forward | Whitelist passthrough | Control experiment |
 
-- **Visual console**: live traffic animation (Phone ⇄ DNS Lab ⇄ Upstream), a six-color "verdict" ledger, stat cards, rule CRUD, one-click presets
-- **Three built-in presets**: hijack-to-intercept-page demo (example.com → local block page), GFW-style pollution simulation, ad-domain blocking
+- **Visual console**: live traffic animation (Phone ⇄ DNS Lab ⇄ Upstream), a color-coded "verdict" ledger, stat cards, rule CRUD, one-click presets
+- **Four built-in presets**: hijack-to-intercept-page demo (example.com → local block page), GFW-style pollution simulation, unfiled ICP simulation, ad-domain blocking
 - **Multi-device management**: persistent phone-connection status in the top bar (no more pop-ups); a device panel for **naming each device** (persisted), viewing per-device online status and stats, and one-click "show this device only" ledger filtering; the ledger's client column is clickable to filter, and each device's first query domain helps identify strangers
 - **Onboarding guide**: a five-step checklist (auto-detects phone connection), illustrated iOS / Android setup steps, a CSS phone mockup, plus background knowledge and a troubleshooting handbook
 - **Upstream hijack detection**: when forwarded answers contain reserved/private-range IPs (e.g. 198.18.x.x from Clash TUN fake-ip), the console raises a banner and marks each affected ledger row, so you know why phones can't reach those addresses
@@ -99,18 +100,19 @@ Set the phone's DNS for that Wi-Fi back to "Automatic"; Ctrl+C to stop the servi
 ## 功能
 
 - **真实 DNS 服务**：UDP 53 端口监听，手机「手动 DNS」直连；未命中规则的查询保真转发到上游（阿里 / 腾讯 / 114 / Google / Cloudflare 或自定义），带 TTL 缓存
-- **五种干预动作**
+- **六种干预动作**
 
   | 动作 | 效果 | 典型用途 |
   |---|---|---|
   | 劫持 | 返回指定 IP | 钓鱼 / 重定向演示 |
   | 模拟污染 | 返回经典污染池假 IP | GFW 式 DNS 污染演示 |
+  | 模拟未 ICP 备案 | 返回本机 IP，显示未备案拦截页 | 中国大陆未 ICP 备案模拟 |
   | NXDOMAIN | 返回「域名不存在」 | 广告 / 追踪域名拦截 |
   | 丢弃 | 不响应 | 制造解析超时 |
   | 正常转发 | 白名单放行 | 对照实验 |
 
-- **可视化控制台**：实时包流动画（手机 ⇄ DNS Lab ⇄ 上游）、六色「判决」账本、统计卡片、规则增删改、一键预设
-- **三个内置预设**：劫持跳转演示（example.com → 本机拦截页）、GFW 风格污染模拟、广告域名拦截
+- **可视化控制台**：实时包流动画（手机 ⇄ DNS Lab ⇄ 上游）、多色「判决」账本、统计卡片、规则增删改、一键预设
+- **四个内置预设**：劫持跳转演示（example.com → 本机拦截页）、GFW 风格污染模拟、未 ICP 备案模拟、广告域名拦截
 - **多设备管理**：顶栏常驻手机连接状态（不再弹窗打扰）；设备面板支持给每台设备**起备注名**（持久化）、查看各自在线状态与统计、一键「只看此设备」筛选账本；账本客户端列可点击筛选，首查域名辅助识别陌生设备
 - **操作引导**：五步新手检查单（自动检测手机接入）、iOS / Android 图文设置步骤、CSS 手机模型、背景知识与排障手册
 - **上游劫持检测**：转发应答含保留/私有段 IP（如 Clash TUN fake-ip 的 198.18.x.x）时，控制台弹出告警并在账本逐行标记，避免手机拿到不可达地址

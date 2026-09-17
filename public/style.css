@@ -21,6 +21,7 @@
   --c-cache: #34D399;
   --c-hijack: #F5B84C;
   --c-pollute: #F2637F;
+  --c-unfiled: #FB923C;
   --c-nxdomain: #A78BFA;
   --c-drop: #7A8590;
   --c-error: #EF5A5A;
@@ -650,6 +651,7 @@ td.t-dim { color: var(--muted); font-size: 12px; }
 .badge[data-action="cache"] { color: var(--c-cache); border-color: rgba(52, 211, 153, 0.35); background: rgba(52, 211, 153, 0.08); }
 .badge[data-action="hijack"] { color: var(--c-hijack); border-color: rgba(245, 184, 76, 0.35); background: rgba(245, 184, 76, 0.08); }
 .badge[data-action="pollute"] { color: var(--c-pollute); border-color: rgba(242, 99, 127, 0.35); background: rgba(242, 99, 127, 0.08); }
+.badge[data-action="unfiled"] { color: var(--c-unfiled); border-color: rgba(251, 146, 60, 0.35); background: rgba(251, 146, 60, 0.08); }
 .badge[data-action="nxdomain"] { color: var(--c-nxdomain); border-color: rgba(167, 139, 250, 0.35); background: rgba(167, 139, 250, 0.08); }
 .badge[data-action="drop"] { color: var(--c-drop); border-color: rgba(122, 133, 144, 0.4); background: rgba(122, 133, 144, 0.1); }
 .badge[data-action="error"] { color: var(--c-error); border-color: rgba(239, 90, 90, 0.35); background: rgba(239, 90, 90, 0.08); }
