@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 export const ACTIONS = {
   hijack: { label: '劫持到指定 IP', value: 'hijack' },
   pollute: { label: '模拟污染(随机假 IP)', value: 'pollute' },
+  unfiled: { label: '模拟未 ICP 备案', value: 'unfiled' },
   nxdomain: { label: '域名不存在(NXDOMAIN)', value: 'nxdomain' },
   drop: { label: '不响应(丢弃)', value: 'drop' },
   forward: { label: '正常转发(白名单)', value: 'forward' },
@@ -20,6 +21,7 @@ const MSGS = {
     badLabel: 'Invalid domain label: "{x}"',
     badAction: 'Unknown action type',
     hijackNeedsIP: 'The hijack action needs a valid IPv4 address (IPv4 only for now)',
+    unfiledNeedsIP: 'The unfiled action needs a valid IPv4 address (IPv4 only for now)',
     dupDomain: 'A rule for {x} already exists — edit or delete it first',
     noRule: 'Rule not found',
     badIP: 'Invalid IPv4 address',
@@ -32,6 +34,7 @@ const MSGS = {
     badLabel: '域名段格式不正确: "{x}"',
     badAction: '无效的动作类型',
     hijackNeedsIP: '劫持动作需要填写合法的 IPv4 地址（当前仅支持 IPv4）',
+    unfiledNeedsIP: '未备案动作需要填写合法的 IPv4 地址（当前仅支持 IPv4）',
     dupDomain: '已存在域名 {x} 的规则，请先编辑或删除',
     noRule: '规则不存在',
     badIP: '非法的 IPv4 地址',
@@ -106,6 +109,24 @@ export const PRESETS = {
       { domain: 'ad.atdmt.com', action: 'nxdomain', note: '广告拦截预设' },
       { domain: 'graph.facebook.com', action: 'nxdomain', note: '广告拦截预设' },
       { domain: 'app-measurement.com', action: 'nxdomain', note: '广告拦截预设' },
+    ],
+  },
+  'icp-unfiled': {
+    key: 'icp-unfiled',
+    name: '未 ICP 备案模拟',
+    nameEn: 'Unfiled ICP simulation',
+    tag: '未备案演示',
+    tagEn: 'Unfiled demo',
+    description:
+      '模拟中国大陆未 ICP 备案域名的访问场景：DNS 正常解析到本机，浏览器打开时显示「未备案」拦截页，' +
+      'API 客户端（如 curl）收到 JSON 403。需要以 sudo 运行（占用 80 端口）。测完删除规则即可恢复。',
+    descriptionEn:
+      'Simulate mainland China unfiled ICP domain access: DNS resolves to this computer, browsers see the "unfiled ICP" intercept page, ' +
+      'API clients (e.g. curl) get JSON 403. Requires sudo (takes port 80). Delete the rule afterwards to revert.',
+    requiresLanIP: true,
+    rules: [
+      { domain: 'example.com', action: 'unfiled', note: '未备案演示预设' },
+      { domain: 'example.org', action: 'unfiled', note: '未备案演示预设' },
     ],
   },
 };
@@ -197,13 +218,16 @@ export class RuleEngine extends EventEmitter {
     if (action === 'hijack') {
       if (!isValidIPv4(ip)) return { error: msg(lang, 'hijackNeedsIP') };
     }
+    if (action === 'unfiled') {
+      if (!isValidIPv4(ip)) return { error: msg(lang, 'unfiledNeedsIP') };
+    }
     const dup = this.rules.find((r) => r.domain === norm.domain);
     if (dup) return { error: msg(lang, 'dupDomain', { x: norm.domain }) };
     const rule = {
       id: randomUUID().slice(0, 8),
       domain: norm.domain,
       action,
-      ip: action === 'hijack' ? ip : null,
+      ip: (action === 'hijack' || action === 'unfiled') ? ip : null,
       note: note ? String(note).slice(0, 100) : '',
       enabled: true,
       createdAt: Date.now(),
@@ -219,7 +243,7 @@ export class RuleEngine extends EventEmitter {
     if (patch.enabled !== undefined) rule.enabled = Boolean(patch.enabled);
     if (patch.action !== undefined && ACTIONS[patch.action]) rule.action = patch.action;
     if (patch.ip !== undefined) {
-      if (rule.action === 'hijack' && !isValidIPv4(patch.ip)) return { error: msg(lang, 'badIP') };
+      if ((rule.action === 'hijack' || rule.action === 'unfiled') && !isValidIPv4(patch.ip)) return { error: msg(lang, 'badIP') };
       rule.ip = patch.ip || null;
     }
     if (patch.note !== undefined) rule.note = String(patch.note).slice(0, 100);
@@ -260,7 +284,7 @@ export class RuleEngine extends EventEmitter {
       if (exists) { skipped++; continue; }
       const res = this.add({
         ...spec,
-        ip: spec.action === 'hijack' ? lanIP : undefined,
+        ip: (spec.action === 'hijack' || spec.action === 'unfiled') ? lanIP : undefined,
         lang,
       });
       if (res.error) { skipped++; continue; }

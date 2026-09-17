@@ -31,6 +31,7 @@ const ACTION_META = {
   cache:     { labelKey: 'action.cache',   color: 'var(--c-cache)' },
   hijack:    { labelKey: 'action.hijack',  color: 'var(--c-hijack)' },
   pollute:   { labelKey: 'action.pollute', color: 'var(--c-pollute)' },
+  unfiled:   { labelKey: 'action.unfiled', color: 'var(--c-unfiled)' },
   nxdomain:  { labelKey: 'action.nxdomain',color: 'var(--c-nxdomain)' },
   drop:      { labelKey: 'action.drop',    color: 'var(--c-drop)' },
   error:     { labelKey: 'action.error',   color: 'var(--c-error)' },
