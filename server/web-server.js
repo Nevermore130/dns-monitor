@@ -303,6 +303,59 @@ export class WebServer {
     res.end('404 Not Found');
   }
 
+  // ── 辅助函数：检测是否为 API 请求 ─────────────────────
+  /** 
+   * Classify API-like requests (as opposed to browser HTML requests).
+   * Conservative: normal mobile Safari/Chrome still get HTML.
+   * API-like when:
+   * - Accept header prefers application/json (and doesn't include text/html), OR
+   * - User-Agent looks like a common non-browser client (curl, wget, python-requests, etc.)
+   */
+  #isApiRequest(req) {
+    const accept = String(req.headers.accept || '').toLowerCase();
+    const ua = String(req.headers['user-agent'] || '').toLowerCase();
+
+    // OPTIONS preflight → treat as API (return JSON)
+    if (req.method === 'OPTIONS') return true;
+
+    // Accept: application/json without text/html
+    if (accept.includes('application/json') && !accept.includes('text/html')) return true;
+
+    // Common non-browser User-Agents (command-line tools, SDKs)
+    const apiUaPatterns = [
+      'curl/', 'wget/', 'python-requests/', 'okhttp/', 'go-http-client/',
+      'postman', 'insomnia', 'apache-httpclient', 'java/', 'axios/',
+      'node-fetch', 'got/', 'superagent', 'guzzle', 'http.rb',
+    ];
+    if (apiUaPatterns.some(p => ua.includes(p))) return true;
+
+    // Missing UA or very short (< 20 chars) is suspicious for a real browser
+    if (!ua || ua.length < 20) return true;
+
+    return false;
+  }
+
+  /** Return JSON 403 for unfiled ICP (API clients) */
+  #serveUnfiledJson(res, host, lang, zh) {
+    const body = {
+      error: 'icp_unfiled',
+      message: zh
+        ? `域名 ${host} 未进行 ICP 备案，访问已被拦截（DNS Lab 教学模拟）`
+        : `Domain ${host} has not been filed with ICP and access is blocked (DNS Lab educational simulation)`,
+      messageZh: `域名 ${host} 未进行 ICP 备案，访问已被拦截（DNS Lab 教学模拟）`,
+      messageEn: `Domain ${host} has not been filed with ICP and access is blocked (DNS Lab educational simulation)`,
+      simulated: true,
+      dnsLab: true,
+    };
+    res.writeHead(403, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Access-Control-Allow-Origin': '*', // Basic CORS for fetch demos
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    });
+    res.end(JSON.stringify(body, null, 2));
+  }
+
   // ── 80 端口劫持演示页 ───────────────────────────────
   #serveHijackPage(req, res) {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
@@ -315,14 +368,26 @@ export class WebServer {
     const unfiled = rule && rule.action === 'unfiled' && rule.ip === lanIP;
     const panelURL = lanIP ? `http://${lanIP}:${this.port}/` : `http://<本机IP>:${this.port}/`;
 
+    // For unfiled: API-like requests get JSON 403, browsers get HTML
+    // Heuristic: API-like if Accept prefers json without html, or non-browser User-Agent
+    if (unfiled && this.#isApiRequest(req)) {
+      return this.#serveUnfiledJson(res, host, lang, zh);
+    }
+
     const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
     })[c]);
 
-    const title = hijacked
+    const title = unfiled
+      ? (zh ? '网站未备案' : 'Website Not Filed')
+      : hijacked
       ? (zh ? '此域名已被 DNS 劫持' : 'This domain has been DNS-hijacked')
       : (zh ? 'DNS Lab 演示页' : 'DNS Lab demo page');
-    const lead = hijacked
+    const lead = unfiled
+      ? (zh
+          ? `根据《互联网信息服务管理办法》及《非经营性互联网信息服务备案管理办法》，<br>网站 <code>${escape(host)}</code> 未进行备案，已被暂停访问。<br><br>这是 <strong>DNS Lab 的教学模拟页面</strong>，用于展示中国大陆未 ICP 备案域名的典型拦截效果。`
+          : `According to China's Internet Information Service regulations,<br>the website <code>${escape(host)}</code> has not been filed with ICP and has been suspended.<br><br>This is a <strong>DNS Lab educational simulation page</strong>, demonstrating typical mainland China unfiled ICP domain access blocking.`)
+      : hijacked
       ? (zh
           ? `你要访问的 <code>${escape(host)}</code> 并没有到达真实服务器。<br>DNS Lab 把它的解析结果劫持到了这台电脑（${escape(lanIP || '本机')}）。`
           : `Your request for <code>${escape(host)}</code> never reached the real server.<br>DNS Lab hijacked its resolution to this computer (${escape(lanIP || 'localhost')}).`)

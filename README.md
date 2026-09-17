@@ -17,7 +17,7 @@ A DNS server + visual console that runs on your computer. Point your phone's DNS
   |---|---|---|
   | Hijack | Returns a chosen IP | Phishing / redirect demo |
   | Pollute | Returns fake IPs from the classic pollution pool | GFW-style DNS poisoning demo |
-  | Unfiled ICP | Returns local IP, shows unfiled ICP intercept page | Mainland China unfiled ICP simulation |
+  | Unfiled ICP | Returns local IP; browsers see intercept page, API clients get JSON 403 | Mainland China unfiled ICP simulation |
   | NXDOMAIN | Returns "domain does not exist" | Ad / tracker blocking |
   | Drop | No response at all | Simulating resolution timeout |
   | Forward | Whitelist passthrough | Control experiment |
@@ -106,7 +106,7 @@ Set the phone's DNS for that Wi-Fi back to "Automatic"; Ctrl+C to stop the servi
   |---|---|---|
   | 劫持 | 返回指定 IP | 钓鱼 / 重定向演示 |
   | 模拟污染 | 返回经典污染池假 IP | GFW 式 DNS 污染演示 |
-  | 模拟未 ICP 备案 | 返回本机 IP，显示未备案拦截页 | 中国大陆未 ICP 备案模拟 |
+  | 模拟未 ICP 备案 | 返回本机 IP；浏览器看到拦截页，API 客户端收到 JSON 403 | 中国大陆未 ICP 备案模拟 |
   | NXDOMAIN | 返回「域名不存在」 | 广告 / 追踪域名拦截 |
   | 丢弃 | 不响应 | 制造解析超时 |
   | 正常转发 | 白名单放行 | 对照实验 |

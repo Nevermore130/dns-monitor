@@ -118,11 +118,11 @@ export const PRESETS = {
     tag: '未备案演示',
     tagEn: 'Unfiled demo',
     description:
-      '模拟中国大陆未 ICP 备案域名的访问场景：DNS 正常解析到本机，但 HTTP 访问时显示「未备案」拦截页。' +
-      '需要以 sudo 运行（占用 80 端口）。测完删除规则即可恢复。',
+      '模拟中国大陆未 ICP 备案域名的访问场景：DNS 正常解析到本机，浏览器打开时显示「未备案」拦截页，' +
+      'API 客户端（如 curl）收到 JSON 403。需要以 sudo 运行（占用 80 端口）。测完删除规则即可恢复。',
     descriptionEn:
-      'Simulate mainland China unfiled ICP domain access: DNS resolves to this computer normally, but HTTP shows an "unfiled ICP" intercept page. ' +
-      'Requires sudo (takes port 80). Delete the rule afterwards to revert.',
+      'Simulate mainland China unfiled ICP domain access: DNS resolves to this computer, browsers see the "unfiled ICP" intercept page, ' +
+      'API clients (e.g. curl) get JSON 403. Requires sudo (takes port 80). Delete the rule afterwards to revert.',
     requiresLanIP: true,
     rules: [
       { domain: 'example.com', action: 'unfiled', note: '未备案演示预设' },
